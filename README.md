@@ -34,6 +34,7 @@ Ou com Docker: `docker build -t guarita-mob . && docker run -p 3001:3001 -v guar
 | `ALLOW_SIGNUP` | ligado | `0` fecha o cadastro de novas imobiliárias |
 
 Serve em qualquer hospedagem que rode Node com disco persistente (Render, Railway, Fly.io, uma VPS).
+Para o **Render** já existe o `render.yaml`; o passo a passo está em [PUBLICAR-NO-RENDER.md](PUBLICAR-NO-RENDER.md).
 Use HTTPS na frente: o cookie de sessão é marcado como seguro automaticamente.
 
 ## Como funciona
