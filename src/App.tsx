@@ -1,9 +1,10 @@
 import { useEffect, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { ToastHost } from './components/ui'
+import { ToastHost, notificar } from './components/ui'
+import { aoFalharGravacao, iniciar, useSessao } from './lib/store'
 import MarketingLayout from './marketing/MarketingLayout'
 import Home from './marketing/Home'
-import { Demonstracao, Integracoes, Login, NaoEncontrada, Planos, ProdutoPage } from './marketing/Paginas'
+import { Cadastro, Demonstracao, Integracoes, Login, NaoEncontrada, Planos, ProdutoPage } from './marketing/Paginas'
 import AppLayout from './app/AppLayout'
 import { Agenda, Dashboard } from './app/Painel'
 import { Funil, Leads, OportunidadeDetalhe, Pessoas, Propostas } from './app/CRM'
@@ -21,14 +22,29 @@ function RolarAoTopo() {
   return null
 }
 
+function Carregando() {
+  return <div className="flex min-h-screen items-center justify-center"><div className="h-10 w-10 animate-spin rounded-full border-4 border-brand border-t-ink" aria-label="Carregando" /></div>
+}
+
 function Protegido({ children }: { children: ReactNode }) {
-  let ok = false
-  try { ok = !!localStorage.getItem('guarita-mob-sessao') } catch { ok = true }
+  const sessao = useSessao()
   const loc = useLocation()
-  return ok ? <>{children}</> : <Navigate to={`/login?r=${encodeURIComponent(loc.pathname)}`} replace />
+  useEffect(() => { void iniciar() }, [])
+  if (sessao.status === 'carregando') return <Carregando />
+  if (sessao.status === 'anonimo') return <Navigate to={`/login?r=${encodeURIComponent(loc.pathname)}`} replace />
+  return <>{children}</>
+}
+
+/** O site e o portal sem imobiliária na URL levam ao exemplo (ou ao site de quem está logado). */
+function SemImobiliaria({ destino }: { destino: 's' | 'portal' }) {
+  const sessao = useSessao()
+  useEffect(() => { void iniciar() }, [])
+  if (sessao.status === 'carregando') return <Carregando />
+  return <Navigate to={`/${destino}/${sessao.imobiliaria?.slug ?? 'demo'}`} replace />
 }
 
 export default function App() {
+  useEffect(() => aoFalharGravacao(m => notificar(`Não foi salvo: ${m}`)), [])
   return (
     <>
       <RolarAoTopo />
@@ -43,8 +59,11 @@ export default function App() {
           <Route path="*" element={<NaoEncontrada />} />
         </Route>
         <Route path="login" element={<Login />} />
-        <Route path="portal" element={<Portal />} />
-        <Route path="s" element={<SiteLayout />}>
+        <Route path="cadastro" element={<Cadastro />} />
+        <Route path="portal" element={<SemImobiliaria destino="portal" />} />
+        <Route path="portal/:slug" element={<Portal />} />
+        <Route path="s" element={<SemImobiliaria destino="s" />} />
+        <Route path="s/:slug" element={<SiteLayout />}>
           <Route index element={<SiteHome />} />
           <Route path="imoveis" element={<SiteBusca />} />
           <Route path="imovel/:id" element={<SiteImovel />} />

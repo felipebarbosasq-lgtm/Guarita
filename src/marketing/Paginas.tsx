@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { planosAluguel, planosCRM, produtos } from './conteudo'
 import { brl, num } from '../lib/format'
 import { Campo, Logo } from '../components/ui'
-import { useDB } from '../lib/store'
+import { cadastrar, entrar, iniciar, useSessao } from '../lib/store'
 
 export function ProdutoPage() {
   const { slug } = useParams()
@@ -129,37 +129,72 @@ export function Demonstracao() {
   )
 }
 
-export function Login() {
-  const nav = useNavigate()
-  const usuarios = useDB(db => db.usuarios)
-  const [email, setEmail] = useState(usuarios[0]?.email ?? '')
-  const destino = new URLSearchParams(location.search).get('r') ?? '/app'
-  const entrar = (e: FormEvent) => {
-    e.preventDefault()
-    const u = usuarios.find(u => u.email === email) ?? usuarios[0]
-    try { localStorage.setItem('guarita-mob-sessao', u.id) } catch { /* sem armazenamento */ }
-    nav(destino)
-  }
+function TelaAcesso({ titulo, frase, children }: { titulo: string; frase: string; children: ReactNode }) {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="hidden flex-col justify-between bg-brand p-12 lg:flex">
         <Logo />
-        <div><h1 className="text-5xl font-black leading-tight">Bom te ver de novo.</h1><p className="mt-4 text-lg">Seus leads, contratos e números esperando por você.</p></div>
+        <div><h1 className="text-5xl font-black leading-tight">{titulo}</h1><p className="mt-4 text-lg">{frase}</p></div>
         <div className="text-sm font-semibold">© Guarita Mob</div>
       </div>
-      <div className="flex items-center justify-center p-6">
-        <form onSubmit={entrar} className="w-full max-w-sm space-y-4">
-          <div className="lg:hidden"><Logo /></div>
-          <h2 className="text-2xl font-black">Entrar</h2>
-          <Campo label="E-mail"><input className="input" value={email} onChange={e => setEmail(e.target.value)} list="usuarios-demo" /></Campo>
-          <datalist id="usuarios-demo">{usuarios.map(u => <option key={u.id} value={u.email}>{u.nome}</option>)}</datalist>
-          <Campo label="Senha"><input className="input" type="password" defaultValue="demo1234" /></Campo>
-          <button className="btn-dark w-full py-3">Entrar</button>
-          <p className="text-xs text-ink-muted">Versão de demonstração: escolha qualquer usuário da lista. Os dados ficam salvos neste navegador.</p>
-          <Link to="/" className="block text-sm font-semibold underline">← Voltar ao site</Link>
-        </form>
-      </div>
+      <div className="flex items-center justify-center p-6">{children}</div>
     </div>
+  )
+}
+
+export function Login() {
+  const nav = useNavigate()
+  const sessao = useSessao()
+  const [email, setEmail] = useState('')
+  const [senha, setSenha] = useState('')
+  const [erro, setErro] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const destino = new URLSearchParams(location.search).get('r') ?? '/app'
+  useEffect(() => { void iniciar() }, [])
+  useEffect(() => { if (sessao.status === 'ok') nav(destino, { replace: true }) }, [sessao.status, destino, nav])
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault(); setErro(''); setEnviando(true)
+    try { await entrar(email, senha) } catch (x) { setErro(x instanceof Error ? x.message : 'Não foi possível entrar.') } finally { setEnviando(false) }
+  }
+  return (
+    <TelaAcesso titulo="Bom te ver de novo." frase="Seus leads, contratos e números esperando por você.">
+      <form onSubmit={enviar} className="w-full max-w-sm space-y-4">
+        <div className="lg:hidden"><Logo /></div>
+        <h2 className="text-2xl font-black">Entrar</h2>
+        <Campo label="E-mail"><input className="input" type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} /></Campo>
+        <Campo label="Senha"><input className="input" type="password" autoComplete="current-password" required value={senha} onChange={e => setSenha(e.target.value)} /></Campo>
+        {erro && <p className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{erro}</p>}
+        <button className="btn-dark w-full py-3" disabled={enviando}>{enviando ? 'Entrando…' : 'Entrar'}</button>
+        <p className="text-sm">Ainda não tem conta? <Link to="/cadastro" className="font-bold underline">Cadastre sua imobiliária</Link></p>
+        <Link to="/" className="block text-sm font-semibold underline">← Voltar ao site</Link>
+      </form>
+    </TelaAcesso>
+  )
+}
+
+export function Cadastro() {
+  const nav = useNavigate()
+  const [f, setF] = useState({ imobiliaria: '', nome: '', email: '', senha: '' })
+  const [erro, setErro] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault(); setErro(''); setEnviando(true)
+    try { await cadastrar(f); nav('/app', { replace: true }) } catch (x) { setErro(x instanceof Error ? x.message : 'Não foi possível criar a conta.') } finally { setEnviando(false) }
+  }
+  return (
+    <TelaAcesso titulo="Comece agora." frase="Crie a conta da sua imobiliária e convide a equipe depois.">
+      <form onSubmit={enviar} className="w-full max-w-sm space-y-4">
+        <div className="lg:hidden"><Logo /></div>
+        <h2 className="text-2xl font-black">Criar conta</h2>
+        <Campo label="Nome da imobiliária"><input className="input" required minLength={2} value={f.imobiliaria} onChange={e => setF({ ...f, imobiliaria: e.target.value })} /></Campo>
+        <Campo label="Seu nome"><input className="input" required minLength={2} autoComplete="name" value={f.nome} onChange={e => setF({ ...f, nome: e.target.value })} /></Campo>
+        <Campo label="E-mail"><input className="input" type="email" required autoComplete="username" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} /></Campo>
+        <Campo label="Senha (mínimo 8 caracteres)"><input className="input" type="password" required minLength={8} autoComplete="new-password" value={f.senha} onChange={e => setF({ ...f, senha: e.target.value })} /></Campo>
+        {erro && <p className="rounded-lg bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{erro}</p>}
+        <button className="btn-dark w-full py-3" disabled={enviando}>{enviando ? 'Criando…' : 'Criar conta'}</button>
+        <p className="text-sm">Já tem conta? <Link to="/login" className="font-bold underline">Entrar</Link></p>
+      </form>
+    </TelaAcesso>
   )
 }
 

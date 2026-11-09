@@ -29,7 +29,7 @@ export default function MarketingLayout() {
             </div>
             <NavLink to="/integracoes" className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-neutral-100">Integrações</NavLink>
             <NavLink to="/planos" className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-neutral-100">Planos</NavLink>
-            <NavLink to="/s" className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-neutral-100">Ver site de exemplo</NavLink>
+            <NavLink to="/s/demo" className="rounded-lg px-3 py-2 text-sm font-semibold hover:bg-neutral-100">Ver site de exemplo</NavLink>
           </nav>
           <div className="hidden items-center gap-2 lg:flex">
             <Link to="/login" className="btn-ghost">Entrar</Link>
@@ -66,8 +66,8 @@ export default function MarketingLayout() {
           <div>
             <div className="mb-3 text-sm font-bold text-brand">Acesso</div>
             <Link to="/login" className="block py-1 text-sm hover:text-white">Entrar no sistema</Link>
-            <Link to="/s" className="block py-1 text-sm hover:text-white">Site de exemplo</Link>
-            <Link to="/portal" className="block py-1 text-sm hover:text-white">Área do inquilino e proprietário</Link>
+            <Link to="/s/demo" className="block py-1 text-sm hover:text-white">Site de exemplo</Link>
+            <Link to="/portal/demo" className="block py-1 text-sm hover:text-white">Área do inquilino e proprietário</Link>
           </div>
         </div>
         <div className="border-t border-white/10 py-5 text-center text-xs text-neutral-500">© {new Date().getFullYear()} Guarita Mob. Todos os direitos reservados.</div>

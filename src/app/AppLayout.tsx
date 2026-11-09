@@ -1,14 +1,37 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Logo } from '../components/ui'
-import { resetarDemo, useDB } from '../lib/store'
+import { Campo, Logo, Modal, notificar } from '../components/ui'
+import { api, sair as encerrar, useDB, useSessao } from '../lib/store'
 import type { Papel } from '../lib/types'
 
 export function useUsuarioAtual() {
-  const usuarios = useDB(db => db.usuarios)
-  let id: string | null = null
-  try { id = localStorage.getItem('guarita-mob-sessao') } catch { /* sem armazenamento */ }
-  return usuarios.find(u => u.id === id) ?? usuarios[0]
+  const sessao = useSessao()
+  const usuarios = useDB(d => d.usuarios)
+  return usuarios.find(u => u.id === sessao.usuario?.id) ?? sessao.usuario!
+}
+
+export function useSlug() {
+  return useSessao().imobiliaria?.slug ?? 'demo'
+}
+
+function TrocarSenha({ onFechar }: { onFechar: () => void }) {
+  const [atual, setAtual] = useState('')
+  const [nova, setNova] = useState('')
+  const [erro, setErro] = useState('')
+  const enviar = async (e: FormEvent) => {
+    e.preventDefault(); setErro('')
+    try { await api('/api/minha-senha', { corpo: { atual, nova } }); notificar('Senha alterada'); onFechar() } catch (x) { setErro(x instanceof Error ? x.message : 'Erro') }
+  }
+  return (
+    <Modal aberto onFechar={onFechar} titulo="Alterar minha senha" largura="max-w-md">
+      <form onSubmit={enviar} className="space-y-4">
+        <Campo label="Senha atual"><input type="password" className="input" required autoComplete="current-password" value={atual} onChange={e => setAtual(e.target.value)} /></Campo>
+        <Campo label="Nova senha (mínimo 8)"><input type="password" className="input" required minLength={8} autoComplete="new-password" value={nova} onChange={e => setNova(e.target.value)} /></Campo>
+        {erro && <p className="text-sm font-semibold text-red-700">{erro}</p>}
+        <div className="flex justify-end gap-2"><button type="button" className="btn-ghost" onClick={onFechar}>Cancelar</button><button className="btn-primary">Salvar</button></div>
+      </form>
+    </Modal>
+  )
 }
 
 const menu: { grupo: string; itens: { to: string; nome: string; papeis?: Papel[] }[] }[] = [
@@ -22,12 +45,14 @@ const menu: { grupo: string; itens: { to: string; nome: string; papeis?: Papel[]
 
 export default function AppLayout() {
   const usuario = useUsuarioAtual()
+  const sessao = useSessao()
   const nav = useNavigate()
   const [aberto, setAberto] = useState(false)
-  const sair = () => { try { localStorage.removeItem('guarita-mob-sessao') } catch { /* ignora */ } nav('/login') }
+  const [senha, setSenha] = useState(false)
+  const sair = async () => { await encerrar(); nav('/login') }
   const sidebar = (
     <nav className="flex h-full flex-col">
-      <div className="px-5 py-5"><Logo dark to="/app" /></div>
+      <div className="px-5 py-5"><Logo dark to="/app" /><div className="mt-2 truncate text-xs font-semibold text-neutral-400">{sessao.imobiliaria?.nome}</div></div>
       <div className="flex-1 overflow-y-auto px-3 pb-6">
         {menu.map(g => {
           const itens = g.itens.filter(i => !i.papeis || i.papeis.includes(usuario?.papel))
@@ -49,8 +74,9 @@ export default function AppLayout() {
         <div className="font-semibold text-white">{usuario?.nome}</div>
         <div className="text-xs capitalize text-neutral-400">{usuario?.papel}</div>
         <div className="mt-3 flex gap-2">
-          <button onClick={sair} className="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20">Sair</button>
-          <button onClick={() => confirm('Restaurar os dados de demonstração? Tudo que foi cadastrado neste navegador será apagado.') && resetarDemo()} className="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20">Restaurar demo</button>
+          <button onClick={() => void sair()} className="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20">Sair</button>
+          <button onClick={() => setSenha(true)} className="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20">Minha senha</button>
+          <a href={`/s/${sessao.imobiliaria?.slug}`} target="_blank" rel="noreferrer" className="rounded-md bg-white/10 px-2 py-1 text-xs text-white hover:bg-white/20">Meu site ↗</a>
         </div>
       </div>
     </nav>
@@ -65,6 +91,7 @@ export default function AppLayout() {
           <Logo to="/app" />
         </header>
         <main className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8"><Outlet /></main>
+        {senha && <TrocarSenha onFechar={() => setSenha(false)} />}
       </div>
     </div>
   )

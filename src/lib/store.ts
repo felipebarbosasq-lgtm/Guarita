@@ -1,56 +1,178 @@
 import { useSyncExternalStore } from 'react'
-import type { Contrato, DB, Fatura, Lancamento, Oportunidade, Pessoa } from './types'
-import { criarSeed } from './seed'
-import { addDias, agoraISO, competenciaDe, diffDias, hoje, round2, uid } from './format'
+import type { DB, Lancamento, Usuario } from './types'
+import { aplicar, compactar, COLECOES, diff, type Op } from './sync'
+import * as dom from './dominio'
+import { uid } from './format'
 
-const CHAVE = 'guarita-mob-db-v1'
+/* ================= Comunicação com o servidor ================= */
 
-function carregar(): DB {
-  try {
-    const raw = localStorage.getItem(CHAVE)
-    if (raw) return { ...criarSeed(), ...JSON.parse(raw) }
-  } catch { /* ignora */ }
-  return criarSeed()
+export class ErroApi extends Error {
+  status: number
+  constructor(mensagem: string, status: number) { super(mensagem); this.status = status }
 }
 
-let estado: DB = carregar()
-const ouvintes = new Set<() => void>()
-
-// Mantém abas e a prévia do site (iframe) sincronizadas quando outra janela altera os dados
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', e => {
-    if (e.key !== CHAVE) return
-    estado = carregar()
-    ouvintes.forEach(l => l())
+export async function api<T = unknown>(caminho: string, opcoes: { metodo?: string; corpo?: unknown; keepalive?: boolean } = {}): Promise<T> {
+  const res = await fetch(caminho, {
+    method: opcoes.metodo ?? (opcoes.corpo !== undefined ? 'POST' : 'GET'),
+    headers: { 'Content-Type': 'application/json', 'X-Cliente-Id': clienteId },
+    body: opcoes.corpo !== undefined ? JSON.stringify(opcoes.corpo) : undefined,
+    credentials: 'same-origin',
+    keepalive: opcoes.keepalive,
   })
+  const dados = await res.json().catch(() => ({}))
+  if (!res.ok) throw new ErroApi((dados as { erro?: string }).erro ?? 'Não foi possível falar com o servidor.', res.status)
+  return dados as T
 }
 
-function salvar() {
-  try { localStorage.setItem(CHAVE, JSON.stringify(estado)) } catch { /* armazenamento indisponível */ }
+/** Identifica esta aba, para o servidor não devolver a ela as próprias alterações. */
+const clienteId = uid()
+
+/* ================= Estado local ================= */
+
+function estadoVazio(): DB {
+  const e = {} as Record<string, unknown>
+  for (const c of COLECOES) e[c] = []
+  e.site = { nome: '', slogan: '', corPrimaria: '#FFD400', corSecundaria: '#0A0A0A', fonte: 'Inter', whatsapp: '', email: '', endereco: '', sobre: '', marcaDagua: false, componentes: [], paginas: [], posts: [] }
+  e.config = { roleta: { ativa: false, corretores: [], ponteiro: 0, apenasHorarioComercial: false }, regua: [], indices: { 'IGP-M': 0, IPCA: 0, INPC: 0, IVAR: 0 }, creditosIA: { usados: 0, limite: 0 }, webhooks: [] }
+  e.analytics = { visitas: [] }
+  return e as unknown as DB
 }
+
+let estado: DB = estadoVazio()
+const ouvintes = new Set<() => void>()
+const avisar = () => ouvintes.forEach(l => l())
 
 export function getDB() { return estado }
-
-/** Aplica uma alteração imutável no banco e notifica a interface. */
-export function update(fn: (db: DB) => void) {
-  const copia: DB = structuredClone(estado)
-  fn(copia)
-  estado = copia
-  salvar()
-  ouvintes.forEach(l => l())
-}
-
-export function resetarDemo() {
-  estado = criarSeed()
-  salvar()
-  ouvintes.forEach(l => l())
-}
 
 export function useDB<T>(sel: (db: DB) => T): T {
   return useSyncExternalStore(cb => { ouvintes.add(cb); return () => ouvintes.delete(cb) }, () => sel(estado))
 }
 
-type ColecaoKey = { [K in keyof DB]: DB[K] extends { id: string }[] ? K : never }[keyof DB]
+/* ================= Sessão ================= */
+
+export interface Sessao { status: 'carregando' | 'anonimo' | 'ok'; usuario?: Usuario; imobiliaria?: { id: string; slug: string; nome: string } }
+let sessao: Sessao = { status: 'carregando' }
+const ouvintesSessao = new Set<() => void>()
+function definirSessao(s: Sessao) { sessao = s; ouvintesSessao.forEach(l => l()) }
+
+export function useSessao() {
+  return useSyncExternalStore(cb => { ouvintesSessao.add(cb); return () => ouvintesSessao.delete(cb) }, () => sessao)
+}
+export function getSessao() { return sessao }
+
+type RespostaSessao = { usuario: Usuario; imobiliaria: { id: string; slug: string; nome: string } }
+
+let iniciado: Promise<void> | null = null
+/** Verifica se há sessão aberta e, se houver, carrega os dados. Pode ser chamada várias vezes. */
+export function iniciar() {
+  iniciado ??= (async () => {
+    try { await abrir(await api<RespostaSessao>('/api/sessao')) }
+    catch { definirSessao({ status: 'anonimo' }) }
+  })()
+  return iniciado
+}
+
+async function abrir(r: RespostaSessao) {
+  estado = await api<DB>('/api/dados')
+  avisar()
+  definirSessao({ status: 'ok', ...r })
+  abrirEventos()
+}
+
+export async function entrar(email: string, senha: string) {
+  const r = await api<RespostaSessao>('/api/login', { corpo: { email, senha } })
+  await abrir(r)
+  iniciado = Promise.resolve()
+}
+
+export async function cadastrar(dados: { imobiliaria: string; nome: string; email: string; senha: string }) {
+  const r = await api<RespostaSessao>('/api/cadastro', { corpo: dados })
+  await abrir(r)
+  iniciado = Promise.resolve()
+}
+
+export async function sair() {
+  await enviarPendentes()
+  await api('/api/logout', { corpo: {} }).catch(() => undefined)
+  fecharEventos()
+  estado = estadoVazio(); avisar()
+  definirSessao({ status: 'anonimo' })
+  iniciado = Promise.resolve()
+}
+
+async function recarregar() {
+  try {
+    const r = await api<RespostaSessao>('/api/sessao')
+    estado = await api<DB>('/api/dados')
+    pendentes = []
+    avisar()
+    definirSessao({ status: 'ok', ...r })
+  } catch (e) {
+    if (e instanceof ErroApi && e.status === 401) { fecharEventos(); definirSessao({ status: 'anonimo' }) }
+  }
+}
+
+/* ================= Tempo real ================= */
+
+let eventos: EventSource | null = null
+function abrirEventos() {
+  fecharEventos()
+  eventos = new EventSource(`/api/eventos?cid=${clienteId}`)
+  eventos.addEventListener('ops', ev => {
+    const ops = JSON.parse((ev as MessageEvent).data) as Op[]
+    const novo = structuredClone(estado)
+    aplicar(novo, ops)
+    aplicar(novo, pendentes) // o que ainda não foi enviado daqui continua valendo na tela
+    estado = novo
+    avisar()
+  })
+  eventos.addEventListener('recarregar', () => { void recarregar() })
+  eventos.addEventListener('sair', () => { void sair() })
+}
+function fecharEventos() { eventos?.close(); eventos = null }
+
+/* ================= Gravação ================= */
+
+let pendentes: Op[] = []
+let timer: ReturnType<typeof setTimeout> | null = null
+let envio: Promise<void> = Promise.resolve()
+let avisoErro: ((m: string) => void) | null = null
+/** Registra quem mostra os erros de gravação na tela. */
+export function aoFalharGravacao(fn: (m: string) => void) { avisoErro = fn }
+
+function enfileirar(ops: Op[]) {
+  pendentes.push(...ops)
+  if (timer) clearTimeout(timer)
+  timer = setTimeout(() => { void enviarPendentes() }, 350)
+}
+
+export function enviarPendentes(keepalive = false) {
+  if (timer) { clearTimeout(timer); timer = null }
+  if (!pendentes.length) return envio
+  const lote = compactar(pendentes)
+  pendentes = []
+  envio = envio.then(() => api('/api/ops', { corpo: { ops: lote }, keepalive }).then(() => undefined)).catch(async (e: unknown) => {
+    avisoErro?.(e instanceof Error ? e.message : 'Não foi possível salvar.')
+    await recarregar() // volta para o que está gravado no servidor
+  })
+  return envio
+}
+
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => { void enviarPendentes(true) })
+
+/** Aplica uma alteração no estado, atualiza a tela na hora e manda as diferenças para o servidor. */
+export function update(fn: (db: DB) => void) {
+  const antes = estado
+  const depois: DB = structuredClone(estado)
+  fn(depois)
+  const ops = diff(antes, depois)
+  if (!ops.length) return
+  estado = depois
+  avisar()
+  enfileirar(ops)
+}
+
+type ColecaoKey = typeof COLECOES[number]
 
 export function salvarItem<K extends ColecaoKey>(col: K, item: DB[K][number]) {
   update(db => {
@@ -64,165 +186,52 @@ export function removerItem<K extends ColecaoKey>(col: K, id: string) {
   update(db => { (db as unknown as Record<string, { id: string }[]>)[col] = (db[col] as { id: string }[]).filter(x => x.id !== id) })
 }
 
-/* ---------------- Regras de negócio ---------------- */
-
-/** Próximo corretor da roleta (round-robin entre os corretores selecionados e ativos). */
-export function proximoCorretorRoleta(db: DB): string | undefined {
-  const r = db.config.roleta
-  const ativos = r.corretores.filter(id => db.usuarios.find(u => u.id === id && u.ativo))
-  if (!r.ativa || ativos.length === 0) return undefined
-  const escolhido = ativos[r.ponteiro % ativos.length]
-  r.ponteiro = (r.ponteiro + 1) % ativos.length
-  return escolhido
+/** Grava a senha de um usuário da equipe (só administradores). */
+export async function definirSenhaUsuario(usuarioId: string, senha: string) {
+  await enviarPendentes()
+  await api(`/api/usuarios/${usuarioId}/senha`, { corpo: { senha } })
 }
 
-/** Captura um lead vindo de qualquer canal (site, portal, WhatsApp...) e cria a oportunidade no CRM. */
-export function capturarLead(dados: { nome: string; email: string; telefone: string; mensagem?: string; origem: string; imovelId?: string }) {
-  let opId = ''
-  update(db => {
-    let pessoa = db.pessoas.find(p => (dados.email && p.email === dados.email) || (dados.telefone && p.telefone === dados.telefone))
-    if (!pessoa) {
-      pessoa = { id: uid(), nome: dados.nome, email: dados.email, telefone: dados.telefone, documento: '', tipos: ['cliente'], criadoEm: hoje() } as Pessoa
-      db.pessoas.unshift(pessoa)
-    }
-    const imovel = db.imoveis.find(i => i.id === dados.imovelId)
-    const funil = imovel?.finalidade === 'aluguel' ? db.funis.find(f => f.nome.toLowerCase().includes('loca')) ?? db.funis[0] : db.funis[0]
-    const corretorId = proximoCorretorRoleta(db)
-    const op: Oportunidade = {
-      id: uid(), titulo: `${dados.nome}${imovel ? ' — ' + imovel.codigo : ''}`, pessoaId: pessoa.id, funilId: funil.id, etapaId: funil.etapas[0].id,
-      corretorId, imovelId: imovel?.id, origem: dados.origem, valor: imovel?.preco ?? 0, status: 'aberta', criadoEm: hoje(), atualizadoEm: hoje(),
-      perfil: imovel ? { finalidade: imovel.finalidade, tipo: imovel.tipo, bairro: imovel.bairro, precoMax: imovel.preco * 1.15 } : {},
-      historico: [{ em: agoraISO(), texto: `Lead recebido via ${dados.origem}${corretorId ? ' e distribuído pela roleta' : ''}.${dados.mensagem ? ' Mensagem: ' + dados.mensagem : ''}` }],
-    }
-    db.oportunidades.unshift(op)
-    db.atividades.unshift({ id: uid(), oportunidadeId: op.id, tipo: 'ligacao', descricao: `Primeiro contato com ${dados.nome}`, prazo: hoje(), responsavelId: corretorId, concluida: false })
-    opId = op.id
-  })
-  return opId
+export async function restaurarBackup(dados: DB) {
+  await enviarPendentes()
+  await api('/api/restaurar', { corpo: { estado: dados } })
+  await recarregar()
 }
 
-export function valorFaturaContrato(c: Contrato) {
-  const itens = [{ descricao: 'Aluguel', valor: c.valorAluguel }, ...c.extras]
-  if (c.seguroIncendio.ativo) itens.push({ descricao: 'Seguro incêndio', valor: c.seguroIncendio.valorMensal })
-  return itens
-}
+/* ================= Regras de negócio (ver dominio.ts) ================= */
 
-/** Gera as faturas da competência para todos os contratos ativos (sem duplicar). */
+export const valorFaturaContrato = dom.valorFaturaContrato
+export const saldoConta = dom.saldoConta
+
+export function capturarLead(dados: dom.DadosLead) {
+  let id = ''
+  update(db => { id = dom.capturarLeadEm(db, dados) })
+  return id
+}
 export function gerarFaturas(competencia: string) {
-  let geradas = 0
-  update(db => {
-    for (const c of db.contratos.filter(c => c.status === 'ativo')) {
-      if (competencia < competenciaDe(c.inicio)) continue
-      if (db.faturas.some(f => f.contratoId === c.id && f.competencia === competencia)) continue
-      const itens = valorFaturaContrato(c)
-      const dia = String(Math.min(c.diaVencimento, 28)).padStart(2, '0')
-      db.faturas.unshift({ id: uid(), contratoId: c.id, competencia, vencimento: `${competencia}-${dia}`, itens, valor: round2(itens.reduce((s, i) => s + i.valor, 0)), status: 'aberta', notificacoes: [] })
-      geradas++
-    }
-  })
-  return geradas
-}
-
-function criarRepasse(db: DB, f: Fatura, garantido: boolean) {
-  const c = db.contratos.find(c => c.id === f.contratoId)!
-  if (db.repasses.some(r => r.faturaId === f.id)) return
-  const primeiro = db.faturas.filter(x => x.contratoId === c.id).sort((a, b) => a.competencia.localeCompare(b.competencia))[0]?.id === f.id
-  const pct = primeiro ? c.taxaPrimeiroAluguel : c.taxaAdm
-  const taxa = round2(c.valorAluguel * pct / 100)
-  // Encargos (condomínio, IPTU, seguro) são repassados integralmente; a taxa incide sobre o aluguel
-  const bruto = f.valor
-  db.repasses.unshift({ id: uid(), faturaId: f.id, contratoId: c.id, proprietarioId: c.proprietarioId, valorBruto: bruto, taxa, valorLiquido: round2(bruto - taxa), status: 'pendente', previsto: addDias(f.pagaEm ?? f.vencimento, 2), garantido })
-  db.lancamentos.unshift({ id: uid(), tipo: 'receber', descricao: `${primeiro ? 'Taxa de intermediação' : 'Taxa de administração'} ${c.codigo} ${f.competencia}`, valor: taxa, vencimento: f.pagaEm ?? f.vencimento, competencia: f.competencia, status: garantido && f.status !== 'paga' ? 'pendente' : 'quitado', quitadoEm: f.pagaEm, planoContaId: primeiro ? 'pc3' : 'pc1', centroCustoId: 'cc2', contaBancariaId: 'cb2', pessoaId: c.proprietarioId, conciliado: false, origem: 'aluguel' })
-}
-
-export function baixarFatura(faturaId: string, data = hoje(), valorPago?: number) {
-  update(db => {
-    const f = db.faturas.find(f => f.id === faturaId)
-    if (!f || f.status === 'paga') return
-    f.status = 'paga'; f.pagaEm = data; f.valorPago = valorPago ?? f.valor
-    const existente = db.repasses.find(r => r.faturaId === f.id)
-    if (existente) {
-      const l = db.lancamentos.find(l => l.origem === 'aluguel' && l.descricao.includes(f.competencia) && l.status === 'pendente' && l.pessoaId === existente.proprietarioId)
-      if (l) { l.status = 'quitado'; l.quitadoEm = data }
-    } else criarRepasse(db, f, false)
-  })
-}
-
-/** Repasse garantido: antecipa ao proprietário no vencimento mesmo sem pagamento do inquilino. */
-export function antecipacaoGarantida() {
   let n = 0
-  update(db => {
-    for (const f of db.faturas.filter(f => f.status === 'aberta' && diffDias(hoje(), f.vencimento) >= 0)) {
-      const c = db.contratos.find(c => c.id === f.contratoId)
-      if (c?.repasseGarantido && !db.repasses.some(r => r.faturaId === f.id)) { criarRepasse(db, f, true); n++ }
-    }
-  })
+  update(db => { n = dom.gerarFaturasEm(db, competencia) })
   return n
 }
-
-export function realizarRepasse(id: string) {
-  update(db => {
-    const r = db.repasses.find(r => r.id === id)
-    if (!r || r.status === 'realizado') return
-    r.status = 'realizado'; r.realizadoEm = hoje()
-  })
+export function baixarFatura(faturaId: string, data?: string, valorPago?: number) { update(db => dom.baixarFaturaEm(db, faturaId, data, valorPago)) }
+export function antecipacaoGarantida() {
+  let n = 0
+  update(db => { n = dom.antecipacaoGarantidaEm(db) })
+  return n
 }
-
-/** Executa a régua de cobrança: registra as notificações devidas hoje em cada fatura aberta. */
+export function realizarRepasse(id: string) { update(db => dom.realizarRepasseEm(db, id)) }
 export function executarRegua() {
-  let enviadas = 0
-  update(db => {
-    for (const f of db.faturas.filter(f => f.status === 'aberta')) {
-      const atraso = diffDias(hoje(), f.vencimento)
-      for (const r of db.config.regua.filter(r => r.ativa)) {
-        if (atraso >= r.dias && !f.notificacoes.some(n => n.regra === r.id)) {
-          f.notificacoes.push({ em: agoraISO(), canal: r.canal, regra: r.id }); enviadas++
-        }
-      }
-    }
-  })
-  return enviadas
+  let n = 0
+  update(db => { n = dom.executarReguaEm(db) })
+  return n
 }
-
-export function aplicarReajuste(contratoId: string, percentual: number) {
-  update(db => {
-    const c = db.contratos.find(c => c.id === contratoId)
-    if (!c) return
-    const para = round2(c.valorAluguel * (1 + percentual / 100))
-    c.historicoReajustes.unshift({ em: hoje(), de: c.valorAluguel, para, indice: c.indice, percentual })
-    c.valorAluguel = para
-  })
-}
-
-/** Cria lançamentos parcelados ou recorrentes (até 99 ocorrências). */
+export function aplicarReajuste(contratoId: string, percentual: number) { update(db => dom.aplicarReajusteEm(db, contratoId, percentual)) }
 export function criarLancamentos(base: Omit<Lancamento, 'id' | 'parcela' | 'grupo'>, ocorrencias: number, modo: 'unico' | 'parcelado' | 'recorrente', addMesesFn: (d: string, n: number) => string) {
-  const n = modo === 'unico' ? 1 : Math.min(Math.max(ocorrencias, 1), 99)
-  const grupo = uid()
-  update(db => {
-    for (let i = 0; i < n; i++) {
-      const venc = addMesesFn(base.vencimento, i)
-      db.lancamentos.unshift({
-        ...base, id: uid(), grupo: n > 1 ? grupo : undefined, vencimento: venc, competencia: venc.slice(0, 7),
-        valor: modo === 'parcelado' ? round2(base.valor / n) : base.valor, parcela: n > 1 ? `${i + 1}/${n}` : undefined,
-        status: i === 0 ? base.status : 'pendente', quitadoEm: i === 0 ? base.quitadoEm : undefined,
-      })
-    }
-  })
-}
-
-export function saldoConta(db: DB, contaId: string) {
-  const c = db.contasBancarias.find(c => c.id === contaId)
-  let s = c?.saldoInicial ?? 0
-  for (const l of db.lancamentos.filter(l => l.status === 'quitado')) {
-    if (l.tipo === 'receber' && l.contaBancariaId === contaId) s += l.valor
-    if (l.tipo === 'pagar' && l.contaBancariaId === contaId) s -= l.valor
-    if (l.tipo === 'transferencia') { if (l.contaBancariaId === contaId) s -= l.valor; if (l.contaDestinoId === contaId) s += l.valor }
-  }
-  return round2(s)
+  update(db => dom.criarLancamentosEm(db, base, ocorrencias, modo, addMesesFn))
 }
 
 export function usarCreditoIA(): boolean {
-  const c = getDB().config.creditosIA
+  const c = estado.config.creditosIA
   if (c.usados >= c.limite) return false
   update(db => { db.config.creditosIA.usados++ })
   return true

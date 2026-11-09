@@ -4,26 +4,36 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "concurrently -k -n api,web -c yellow,white \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:web": "vite",
+    "dev:api": "SEED_DEMO=1 node --no-warnings --watch server/index.ts",
+    "build": "tsc -b && tsc -p server/tsconfig.json && vite build",
+    "start": "NODE_ENV=production node --no-warnings server/index.ts",
+    "test": "node --no-warnings --test server/*.test.ts",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "express": "^5.3.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router-dom": "^6.30.6"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "autoprefixer": "^10.6.2",
+    "concurrently": "^10.0.7",
     "oxlint": "^1.90.0",
     "postcss": "^8.5.32",
     "tailwindcss": "^3.4.19",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

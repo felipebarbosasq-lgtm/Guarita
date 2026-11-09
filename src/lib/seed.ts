@@ -1,5 +1,5 @@
-import type { DB, Imovel } from './types'
-import { addDias, addMeses, hoje, placeholderFoto } from './format'
+import type { DB, Imovel, Usuario } from './types.ts'
+import { addDias, addMeses, hoje, placeholderFoto, uid } from './format.ts'
 
 export function criarSeed(): DB {
   const h = hoje()
@@ -99,6 +99,26 @@ export function criarSeed(): DB {
       creditosIA: { usados: 0, limite: 150 },
       webhooks: [],
     },
+    analytics: { visitas: [] },
+  }
+}
+
+/**
+ * Dados iniciais de uma imobiliária nova: sem clientes, imóveis ou contratos,
+ * mas com funis, plano de contas, régua de cobrança e site prontos para usar.
+ */
+export function criarBase(nomeImobiliaria: string, admin: Usuario): DB {
+  const demo = criarSeed()
+  const id = () => uid()
+  const funis = demo.funis.map(f => ({ ...f, id: id(), etapas: f.etapas.map(e => ({ ...e, id: id() })) }))
+  const planoContas = demo.planoContas.map(p => ({ ...p, id: id() }))
+  const centrosCusto = demo.centrosCusto.map(c => ({ ...c, id: id() }))
+  const contasBancarias = [{ id: id(), nome: 'Conta principal', banco: '', saldoInicial: 0 }, { id: id(), nome: 'Conta repasses', banco: '', saldoInicial: 0 }]
+  return {
+    usuarios: [admin], pessoas: [], imoveis: [], funis, oportunidades: [], atividades: [], propostas: [], contratos: [], faturas: [], repasses: [],
+    planoContas, centrosCusto, contasBancarias, lancamentos: [],
+    site: { ...demo.site, nome: nomeImobiliaria, email: admin.email, whatsapp: '', endereco: '', sobre: `Conheça a ${nomeImobiliaria}: compra, venda e administração de imóveis.`, paginas: [], posts: [] },
+    config: { ...demo.config, roleta: { ativa: true, corretores: [admin.id], ponteiro: 0, apenasHorarioComercial: false }, regua: demo.config.regua.map(r => ({ ...r, id: id() })), creditosIA: { usados: 0, limite: 150 }, webhooks: [] },
     analytics: { visitas: [] },
   }
 }

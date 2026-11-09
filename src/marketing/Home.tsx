@@ -15,7 +15,7 @@ export default function Home() {
             <p className="mt-5 max-w-xl text-lg">Leads, funil de vendas, site, contratos de aluguel, cobrança, repasse e financeiro conversando entre si. Menos planilha, mais negócio fechado.</p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link to="/demonstracao" className="btn-dark px-6 py-3 text-base">Agendar demonstração</Link>
-              <Link to="/login" className="btn bg-white px-6 py-3 text-base text-ink hover:bg-neutral-100">Testar agora</Link>
+              <Link to="/cadastro" className="btn bg-white px-6 py-3 text-base text-ink hover:bg-neutral-100">Criar conta</Link>
             </div>
           </div>
           <div className="relative">

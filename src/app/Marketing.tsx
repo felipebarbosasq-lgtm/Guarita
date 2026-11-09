@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Badge, Barra, Campo, Kpi, PageHeader, Tabs, notificar } from '../components/ui'
 import { getDB, salvarItem, update, useDB, usarCreditoIA } from '../lib/store'
 import { addDias, brl, dataBR, hoje, num, placeholderFoto, uid } from '../lib/format'
 import type { Imovel, SiteConfig, TipoComponenteSite } from '../lib/types'
 import { novoImovel, tiposImovel } from './Imoveis'
+import { useSlug } from './AppLayout'
 
 export const nomeComponente: Record<TipoComponenteSite, string> = {
   banner: 'Banner principal', busca: 'Busca de imóveis', destaques: 'Imóveis em destaque', lancamentos: 'Lançamentos', aluguel: 'Imóveis para alugar', venda: 'Imóveis à venda',
@@ -14,13 +15,16 @@ export const nomeComponente: Record<TipoComponenteSite, string> = {
 /* ---------------- Editor do site ---------------- */
 export function EditorSite() {
   const site = useDB(d => d.site)
+  const slug = useSlug()
   const [aba, setAba] = useState<'identidade' | 'home' | 'paginas' | 'blog'>('identidade')
   const [modo, setModo] = useState<'desktop' | 'mobile'>('desktop')
-  const [versao, setVersao] = useState(0)
-  const set = (p: Partial<SiteConfig>) => { update(d => { Object.assign(d.site, p) }); setVersao(v => v + 1) }
-  const mover = (i: number, dir: -1 | 1) => { update(d => { const c = d.site.componentes; const j = i + dir; if (j < 0 || j >= c.length) return;[c[i], c[j]] = [c[j], c[i]] }); setVersao(v => v + 1) }
+  const previa = useRef<HTMLIFrameElement>(null)
+  // A prévia recebe a configuração por mensagem, sem esperar a gravação no servidor
+  useEffect(() => { previa.current?.contentWindow?.postMessage({ tipo: 'guarita-previa', site }, location.origin) }, [site])
+  const set = (p: Partial<SiteConfig>) => update(d => { Object.assign(d.site, p) })
+  const mover = (i: number, dir: -1 | 1) => update(d => { const c = d.site.componentes; const j = i + dir; if (j < 0 || j >= c.length) return;[c[i], c[j]] = [c[j], c[i]] })
   return <>
-    <PageHeader titulo="Editor do site" sub="Personalize o site da imobiliária e veja o resultado ao vivo" acoes={<a href="/s" target="_blank" rel="noreferrer" className="btn-dark">Abrir site ↗</a>} />
+    <PageHeader titulo="Editor do site" sub="Personalize o site da imobiliária e veja o resultado ao vivo" acoes={<a href={`/s/${slug}`} target="_blank" rel="noreferrer" className="btn-dark">Abrir site ↗</a>} />
     <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
       <div>
         <Tabs abas={[{ id: 'identidade', nome: 'Identidade' }, { id: 'home', nome: 'Página inicial' }, { id: 'paginas', nome: 'Páginas' }, { id: 'blog', nome: 'Blog' }]} ativa={aba} onChange={setAba} />
@@ -41,7 +45,7 @@ export function EditorSite() {
         {aba === 'home' && <div className="card space-y-2">
           <p className="mb-2 text-sm text-ink-muted">Ative, desative e reordene os {site.componentes.length} blocos da página inicial.</p>
           {site.componentes.map((c, i) => <div key={c.id} className={`flex items-center gap-2 rounded-lg border p-2 ${c.ativo ? 'border-ink bg-brand-light' : 'border-neutral-200'}`}>
-            <input type="checkbox" className="h-4 w-4 accent-ink" checked={c.ativo} onChange={e => { update(d => { d.site.componentes[i].ativo = e.target.checked }); setVersao(v => v + 1) }} />
+            <input type="checkbox" className="h-4 w-4 accent-ink" checked={c.ativo} onChange={e => update(d => { d.site.componentes[i].ativo = e.target.checked })} />
             <span className="flex-1 text-sm font-semibold">{nomeComponente[c.tipo]}</span>
             <button className="rounded px-2 hover:bg-white" onClick={() => mover(i, -1)} aria-label="Subir">↑</button><button className="rounded px-2 hover:bg-white" onClick={() => mover(i, 1)} aria-label="Descer">↓</button>
           </div>)}
@@ -50,7 +54,7 @@ export function EditorSite() {
           {site.paginas.map((p, i) => <div key={p.id} className="space-y-2 rounded-lg border border-neutral-200 p-3">
             <input className="input font-bold" value={p.titulo} onChange={e => update(d => { d.site.paginas[i].titulo = e.target.value })} />
             <textarea className="input" rows={3} value={p.conteudo} onChange={e => update(d => { d.site.paginas[i].conteudo = e.target.value })} />
-            <div className="flex justify-between text-xs"><a className="underline" href={`/s/pagina/${p.id}`} target="_blank" rel="noreferrer">Ver página</a><button className="text-red-700 underline" onClick={() => update(d => { d.site.paginas.splice(i, 1) })}>Remover</button></div>
+            <div className="flex justify-between text-xs"><a className="underline" href={`/s/${slug}/pagina/${p.id}`} target="_blank" rel="noreferrer">Ver página</a><button className="text-red-700 underline" onClick={() => update(d => { d.site.paginas.splice(i, 1) })}>Remover</button></div>
           </div>)}
           <button className="btn-ghost" onClick={() => update(d => { d.site.paginas.push({ id: uid(), titulo: 'Nova página', conteudo: '' }) })}>+ Página</button>
         </div>}
@@ -72,7 +76,7 @@ export function EditorSite() {
           </div>
         </div>
         <div className="flex justify-center rounded-xl border border-neutral-200 bg-neutral-200 p-3">
-          <iframe key={versao} title="Prévia do site" src="/s?previa=1" className={`h-[720px] rounded-lg bg-white shadow ${modo === 'mobile' ? 'w-[390px]' : 'w-full'}`} />
+          <iframe ref={previa} onLoad={() => previa.current?.contentWindow?.postMessage({ tipo: 'guarita-previa', site }, location.origin)} title="Prévia do site" src={`/s/${slug}?previa=1`} className={`h-[720px] rounded-lg bg-white shadow ${modo === 'mobile' ? 'w-[390px]' : 'w-full'}`} />
         </div>
       </div>
     </div>
@@ -82,6 +86,7 @@ export function EditorSite() {
 /* ---------------- Analytics ---------------- */
 export function Analytics() {
   const db = useDB(d => d)
+  const slug = useSlug()
   const [dias, setDias] = useState(30)
   const desde = addDias(hoje(), -dias)
   const visitas = db.analytics.visitas.filter(v => v.data >= desde)
@@ -96,7 +101,7 @@ export function Analytics() {
       <Kpi titulo="Leads do site" valor={leadsSite} />
       <Kpi titulo="Conversão" valor={visitas.length ? `${((leadsSite / visitas.length) * 100).toFixed(1)}%` : '—'} detalhe="leads ÷ visualizações" />
     </div>
-    {visitas.length === 0 && <p className="mt-4 rounded-xl bg-brand-light p-4 text-sm">Ainda não há visitas registradas. Abra o <a className="font-bold underline" href="/s" target="_blank" rel="noreferrer">site</a> e navegue pelos imóveis para ver os números aparecerem aqui.</p>}
+    {visitas.length === 0 && <p className="mt-4 rounded-xl bg-brand-light p-4 text-sm">Ainda não há visitas registradas. Abra o <a className="font-bold underline" href={`/s/${slug}`} target="_blank" rel="noreferrer">site</a> e navegue pelos imóveis para ver os números aparecerem aqui.</p>}
     <div className="mt-6 grid gap-6 lg:grid-cols-3">
       <div className="card"><h2 className="mb-4 font-black">Por dia</h2><div className="space-y-1">{porDia.map(p => <Barra key={p.d} rotulo={dataBR(p.d).slice(0, 5)} valor={p.n} max={Math.max(1, ...porDia.map(x => x.n))} />)}</div></div>
       <div className="card"><h2 className="mb-4 font-black">Páginas mais vistas</h2><div className="space-y-2">{porPagina.map(([p, n]) => <Barra key={p} rotulo={p} valor={n} max={porPagina[0][1]} />)}</div></div>

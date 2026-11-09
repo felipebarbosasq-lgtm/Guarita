@@ -5,6 +5,7 @@ import { capturarLead, salvarItem, update, useDB } from '../lib/store'
 import { agoraISO, brl, dataBR, dataHoraBR, diffDias, hoje, uid } from '../lib/format'
 import type { Atividade, Oportunidade, Pessoa, Proposta, StatusProposta, TipoPessoa } from '../lib/types'
 import { AtividadeModal, nomeTipoAtividade } from './Painel'
+import { useSlug } from './AppLayout'
 
 const origens = ['Site', 'Portal A', 'Portal B', 'WhatsApp', 'Indicação', 'Redes sociais', 'Placa', 'Telefone']
 
@@ -151,13 +152,14 @@ export function OportunidadeDetalhe() {
   const [atv, setAtv] = useState<Atividade | null>(null)
   const [prop, setProp] = useState<Proposta | null>(null)
   const [nota, setNota] = useState('')
+  const slug = useSlug()
   const o = db.oportunidades.find(o => o.id === id)
   if (!o) return <Vazio texto="Oportunidade não encontrada." acao={<Link to="/app/funil" className="btn-primary">Voltar ao funil</Link>} />
   const pessoa = db.pessoas.find(p => p.id === o.pessoaId)
   const funil = db.funis.find(f => f.id === o.funilId)
   const imovel = db.imoveis.find(i => i.id === o.imovelId)
   const set = (fn: (x: Oportunidade) => void) => update(d => { const x = d.oportunidades.find(x => x.id === o.id)!; fn(x); x.atualizadoEm = hoje() })
-  const linkVitrine = `${location.origin}/s/selecao/${o.id}`
+  const linkVitrine = `${location.origin}/s/${slug}/selecao/${o.id}`
   return (
     <>
       <PageHeader titulo={o.titulo} sub={`${funil?.nome} · criada em ${dataBR(o.criadoEm)} · origem ${o.origem}`} acoes={<>
