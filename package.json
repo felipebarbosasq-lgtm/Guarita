@@ -1,0 +1,17 @@
+{
+  "name": "guarita-imobiliaria-site",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Site da Guarita Imobiliária: site estático (HTML/CSS/JS) + Supabase + Netlify",
+  "type": "module",
+  "scripts": {
+    "build": "node tools/build-config.mjs",
+    "preview": "node tools/preview.mjs",
+    "zip": "python3 tools/make_zip.py",
+    "test": "node tests/run-all.mjs"
+  },
+  "devDependencies": {
+    "pg": "^8.13.0"
+  },
+  "engines": { "node": ">=20" }
+}
