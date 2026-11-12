@@ -9,10 +9,17 @@
 insert into public.imoveis
   (slug, codigo, nome, tipo, complemento, finalidade, endereco, bairro, cidade, estado,
    valor, area_privativa, dormitorios, suites, vagas, status, publicado, destaque, ordem, fotos)
-values
-  ('eleganza-tower-apartamento-4200', 'GUA-0001', 'Eleganza Tower', 'Apartamento', '4200', 'venda', 'Rua 1101, 140', 'Centro', 'Balneário Camboriú', 'SC',
-   7519000.00, 140, 4, 2, 3, 'disponivel', true, true, 1,
-   '[{"lg": "assets/img/imovel/eleganza/01-1280.webp", "md": "assets/img/imovel/eleganza/01-720.webp", "th": "assets/img/imovel/eleganza/01-t-200.webp", "w": 1280, "h": 856, "alt": "Sala de jantar integrada com vista panorâmica para o mar, apartamento 4200 do Eleganza Tower"}, {"lg": "assets/img/imovel/eleganza/02-1280.webp", "md": "assets/img/imovel/eleganza/02-720.webp", "th": "assets/img/imovel/eleganza/02-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/03-1280.webp", "md": "assets/img/imovel/eleganza/03-720.webp", "th": "assets/img/imovel/eleganza/03-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/04-1280.webp", "md": "assets/img/imovel/eleganza/04-720.webp", "th": "assets/img/imovel/eleganza/04-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/05-1280.webp", "md": "assets/img/imovel/eleganza/05-720.webp", "th": "assets/img/imovel/eleganza/05-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/06-1280.webp", "md": "assets/img/imovel/eleganza/06-720.webp", "th": "assets/img/imovel/eleganza/06-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/07-1280.webp", "md": "assets/img/imovel/eleganza/07-720.webp", "th": "assets/img/imovel/eleganza/07-t-200.webp", "w": 1280, "h": 856, "alt": ""}, {"lg": "assets/img/imovel/eleganza/08-1280.webp", "md": "assets/img/imovel/eleganza/08-720.webp", "th": "assets/img/imovel/eleganza/08-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/09-1280.webp", "md": "assets/img/imovel/eleganza/09-720.webp", "th": "assets/img/imovel/eleganza/09-t-200.webp", "w": 1280, "h": 856, "alt": ""}, {"lg": "assets/img/imovel/eleganza/10-1280.webp", "md": "assets/img/imovel/eleganza/10-720.webp", "th": "assets/img/imovel/eleganza/10-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/11-1280.webp", "md": "assets/img/imovel/eleganza/11-720.webp", "th": "assets/img/imovel/eleganza/11-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/12-1280.webp", "md": "assets/img/imovel/eleganza/12-720.webp", "th": "assets/img/imovel/eleganza/12-t-200.webp", "w": 1280, "h": 855, "alt": ""}, {"lg": "assets/img/imovel/eleganza/13-1280.webp", "md": "assets/img/imovel/eleganza/13-720.webp", "th": "assets/img/imovel/eleganza/13-t-200.webp", "w": 1280, "h": 854, "alt": ""}, {"lg": "assets/img/imovel/eleganza/14-1280.webp", "md": "assets/img/imovel/eleganza/14-720.webp", "th": "assets/img/imovel/eleganza/14-t-200.webp", "w": 1280, "h": 849, "alt": ""}]'::jsonb)
+select 'eleganza-tower-apartamento-4200', 'GUA-0001', 'Eleganza Tower', 'Apartamento', '4200', 'venda',
+  'Rua 1101, 140', 'Centro', 'Balneário Camboriú', 'SC', 7519000.00, 140, 4, 2, 3, 'disponivel', true, true, 1,
+  jsonb_agg(jsonb_build_object(
+    'lg', format('assets/img/imovel/eleganza/%s-1280.webp', lpad(n::text, 2, '0')),
+    'md', format('assets/img/imovel/eleganza/%s-720.webp', lpad(n::text, 2, '0')),
+    'th', format('assets/img/imovel/eleganza/%s-t-200.webp', lpad(n::text, 2, '0')),
+    'w', 1280,
+    'h', (array[856,854,854,854,854,854,856,854,856,854,854,855,854,849])[n],
+    'alt', case when n = 1 then 'Sala de jantar integrada com vista panorâmica para o mar, apartamento 4200 do Eleganza Tower' else '' end
+  ) order by n)
+from generate_series(1, 14) as n
 on conflict (slug) do nothing;
 
 -- ---------------------------------------------------------------------
