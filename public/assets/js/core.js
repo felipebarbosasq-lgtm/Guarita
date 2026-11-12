@@ -64,7 +64,8 @@ function card(im) {
 const COLS = 'id,slug,codigo,nome,tipo,complemento,finalidade,endereco,bairro,cidade,estado,valor,area_privativa,area_total,dormitorios,suites,banheiros,vagas,descricao,caracteristicas,info_complementar,status,publicado,destaque,ordem,fotos,updated_at';
 async function rest(q) {
   const r = await fetch(`${CONFIG.supabaseUrl.replace(/\/$/, '')}/rest/v1/imoveis?${q}`, {
-    headers: { apikey: CONFIG.supabaseAnonKey, Authorization: `Bearer ${CONFIG.supabaseAnonKey}`, Accept: 'application/json' }
+    // chave antiga "anon" (JWT, começa com eyJ) vai também como Bearer; a nova "publishable" (sb_publishable_…) só no apikey
+    headers: { apikey: CONFIG.supabaseAnonKey, ...(/^eyJ/.test(CONFIG.supabaseAnonKey) ? { Authorization: `Bearer ${CONFIG.supabaseAnonKey}` } : {}), Accept: 'application/json' }
   });
   if (!r.ok) throw new Error('Falha ao carregar imóveis (' + r.status + ')');
   return r.json();

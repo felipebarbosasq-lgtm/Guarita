@@ -36,7 +36,7 @@ export function sitemap(origin, imoveis) {
 }
 
 export async function fetchImoveis(supabaseUrl, key, query) {
-  const r = await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/imoveis?${query}`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
+  const r = await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/imoveis?${query}`, { headers: { apikey: key, ...(/^eyJ/.test(key) ? { Authorization: `Bearer ${key}` } : {}) } });
   if (!r.ok) throw new Error('Supabase ' + r.status);
   return r.json();
 }

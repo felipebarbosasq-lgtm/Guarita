@@ -17,6 +17,7 @@ if (url && !/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$|^https?:\/\/(localhost|12
   console.error(`SUPABASE_URL inválida: "${url}". Use o endereço do projeto, ex.: https://abcdefgh.supabase.co`); process.exit(1);
 }
 if (url && !key) { console.error('SUPABASE_URL definida, mas falta SUPABASE_ANON_KEY.'); process.exit(1); }
+if (key && /^sb_secret_/.test(key)) { console.error('A chave informada é a "secret" (sb_secret_…). Use a "publishable" (sb_publishable_…) ou a "anon public".'); process.exit(1); }
 if (key && /service_role/.test(Buffer.from((key.split('.')[1] || ''), 'base64').toString())) {
   console.error('A chave informada em SUPABASE_ANON_KEY é a "service_role" (secreta). Use a chave "anon public".'); process.exit(1);
 }
