@@ -12,7 +12,10 @@ su postgres -c "psql -q -d guarita_test" <<'SQL'
 insert into auth.users (id,email,encrypted_password) values
  ('11111111-1111-1111-1111-111111111111','admin@teste.local',crypt('senha-admin-123',gen_salt('bf'))),
  ('22222222-2222-2222-2222-222222222222','intruso@teste.local',crypt('senha-intruso-123',gen_salt('bf')));
-insert into public.admins (user_id,email,nome) values ('11111111-1111-1111-1111-111111111111','admin@teste.local','Admin Teste');
+insert into public.admins (user_id,email,nome,papel,recebe_rodizio) values ('11111111-1111-1111-1111-111111111111','admin@teste.local','Admin Teste','gestor',false);
+insert into auth.users (id,email,encrypted_password) values
+ ('33333333-3333-3333-3333-333333333333','joao@teste.local',crypt('senha-joao-123',gen_salt('bf'))),
+ ('44444444-4444-4444-4444-444444444444','maria@teste.local',crypt('senha-maria-123',gen_salt('bf')));
 SQL
 rm -rf /tmp/guarita-storage
 echo "Banco guarita_test pronto."

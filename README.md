@@ -130,6 +130,8 @@ Para redirecionar endereços antigos, acrescente blocos `[[redirects]]` no `netl
 Quando uma novidade precisar de campos novos no banco, ela vem num arquivo `supabase/atualizacao-NN-*.sql`.
 Rode cada um **uma vez**, em ordem, no **SQL Editor** do Supabase (*New query > colar > Run*). Eles não apagam dados.
 - `atualizacao-02-oportunidade.sql`: selo Oportunidade e preço "de/por".
+- `atualizacao-03-crm-equipe-clientes.sql`: CRM, equipe e clientes.
+- `atualizacao-04-crm-historico-rodizio.sql`: histórico, rodízio/manual e contatos do site no CRM.
 Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizações) e do `seed.sql`.
 
 ### 3.7 Publicar atualizações futuras
@@ -163,6 +165,24 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
   **Valor anterior "de"**: o site exibe ~~De R$ 470.000,00~~ **Por R$ 350.000,00** (o "de" precisa ser maior que o valor atual).
 - **Excluir** pede confirmação e apaga também as fotos enviadas.
 - Formatação automática para todos os anúncios: R$ 1.234.567,00, áreas em m², singular/plural, mesmo cartão e mesma página.
+
+## 4.1 CRM (abas Clientes, Equipe e Painel)
+- **Equipe:** gestores veem e fazem tudo; corretores veem **só os próprios clientes** e podem cadastrar e editar
+  imóveis (não excluir). Para incluir alguém: crie o login no Supabase (*Authentication > Users > Add user*, com
+  *Auto Confirm User*) e depois cadastre o mesmo e-mail na aba **Equipe**. Desligar "Acesso ativo" bloqueia a pessoa.
+- **Clientes:** WhatsApp (e e-mail) não se repetem. Se um corretor tentar cadastrar um cliente que já é de outro, o
+  cadastro é **bloqueado** e o aviso mostra quem está atendendo e desde quando. Só o gestor transfere ou exclui clientes.
+- **Etapas:** Novo contato › Em atendimento › Visita agendada › Proposta › Fechado / Perdido (com motivo), próximo
+  contato (retorno) e imóveis de interesse.
+- **Histórico:** ligações, mensagens, visitas e anotações; mudanças de etapa, distribuições e transferências são
+  registradas sozinhas.
+- **Contatos do site:** os formulários Comprar, Alugar e Anunciar continuam abrindo o WhatsApp e também criam o
+  cliente no CRM. Na aba **Equipe**, o gestor escolhe **Rodízio automático** (vai para o próximo corretor da vez, entre
+  os que estão com "Rodízio" ligado) ou **Manual** (fica em "Sem corretor" e o gestor envia pelo **Painel**).
+  Se a pessoa já for cliente, o contato é anotado no histórico dela, sem duplicar.
+- **Painel:** em andamento, novos, sem corretor, retornos vencidos, fechados no mês e tabela por corretor.
+- Banco: `supabase/atualizacao-03-crm-equipe-clientes.sql` e `supabase/atualizacao-04-crm-historico-rodizio.sql`
+  (rodar uma vez, nessa ordem). Quem já era administrador vira gestor.
 
 ## 5. Segurança
 - O navegador só recebe a chave **anon** do Supabase, que é pública por natureza. O que ela pode fazer é limitado pelas

@@ -57,6 +57,12 @@
 <div id="v-app" hidden>
  <header class="adm-top">
   <a class="adm-brand" href="../" target="_blank" rel="noopener" title="Abrir o site"><img src="../assets/img/site/logo.png" alt="Guarita Imobiliária" width="300" height="251"><span>Painel</span></a>
+  <div class="adm-tabs" role="navigation" aria-label="Seções do painel">
+   <button type="button" data-tab="imoveis" aria-current="page">Imóveis</button>
+   <button type="button" data-tab="clientes">Clientes<span class="tab-n" id="n-clientes" hidden></span></button>
+   <button type="button" data-tab="equipe" data-gestor hidden>Equipe</button>
+   <button type="button" data-tab="painel" data-gestor hidden>Painel</button>
+  </div>
   <div class="adm-user"><span id="u-email"></span><button class="adm-linkbtn" type="button" data-logout>Sair</button></div>
  </header>
 
@@ -172,6 +178,123 @@
     </div>
    </form>
   </section>
+
+  <!-- ================= CRM: clientes ================= -->
+  <section id="s-clientes" hidden>
+   <div class="adm-head">
+    <div><h1>Clientes</h1><p class="muted" id="cl-count"></p></div>
+    <button class="btn gold" type="button" id="b-novo-cliente">+ Novo cliente</button>
+   </div>
+   <div class="crm-off adm-box" id="crm-off" hidden>
+    <h2>Falta atualizar o banco</h2>
+    <p>Para usar o CRM, rode no Supabase (SQL Editor) os arquivos <code>supabase/atualizacao-03-crm-equipe-clientes.sql</code> e depois <code>supabase/atualizacao-04-crm-historico-rodizio.sql</code>.</p>
+   </div>
+   <div class="adm-tools">
+    <label class="sr" for="cl-q">Pesquisar clientes</label>
+    <input type="search" id="cl-q" placeholder="Pesquisar por nome, WhatsApp ou e-mail" autocomplete="off">
+    <label class="sr" for="cl-etapa">Etapa</label>
+    <select id="cl-etapa"><option value="">Todas as etapas</option><option value="ativos">Em andamento</option></select>
+    <label class="sr" for="cl-corretor">Corretor</label>
+    <select id="cl-corretor" data-gestor hidden><option value="">Todos os corretores</option><option value="_sem">⚠ Sem corretor</option></select>
+    <label class="crm-chk"><input type="checkbox" id="cl-atrasados"> Só retornos vencidos</label>
+   </div>
+   <div class="etapas" id="cl-etapas" aria-label="Clientes por etapa"></div>
+   <ol class="adm-list" id="cl-list" aria-live="polite"></ol>
+   <p class="adm-empty" id="cl-empty" hidden>Nenhum cliente encontrado.</p>
+  </section>
+
+  <!-- ================= CRM: ficha do cliente ================= -->
+  <section id="s-cliente" hidden>
+   <div class="adm-head"><div><button class="adm-linkbtn" type="button" id="b-cl-voltar">← Voltar aos clientes</button><h1 id="cl-titulo">Novo cliente</h1></div></div>
+   <div class="dup" id="cl-dup" role="alert" hidden></div>
+   <form id="f-cliente" novalidate>
+    <div class="adm-edit">
+     <div class="adm-form">
+      <fieldset class="adm-box"><legend>Dados do cliente</legend>
+       <div class="fg">
+        <div class="f full"><label for="c-nome-c">Nome *</label><input id="c-nome-c" name="nome" required maxlength="120"><span class="err"></span></div>
+        <div class="f"><label for="c-whatsapp">WhatsApp com DDD *</label><input id="c-whatsapp" name="whatsapp" type="tel" inputmode="tel" placeholder="(47) 99999-9999" required><span class="err"></span></div>
+        <div class="f"><label for="c-email">E-mail <span class="opt-hint">(opcional)</span></label><input id="c-email" name="email" type="email" maxlength="160"><span class="err"></span></div>
+        <div class="f"><label for="c-interesse">Interesse</label><select id="c-interesse" name="interesse"><option value="comprar">Comprar</option><option value="alugar">Alugar</option><option value="anunciar">Anunciar / administrar imóvel</option><option value="investir">Investir</option></select></div>
+        <div class="f"><label for="c-faixa">Faixa de valor</label><input id="c-faixa" name="faixa_valor" maxlength="80" list="faixas"><datalist id="faixas"><option>R$ 1 a 2 milhões</option><option>R$ 2,5 a 3,5 milhões</option><option>R$ 4 a 6 milhões</option><option>A partir de R$ 6,5 milhões</option></datalist></div>
+        <div class="f full"><label for="c-regiao">Região de interesse</label><input id="c-regiao" name="regiao" maxlength="120" list="regioes-l"><datalist id="regioes-l"><option>Balneário Camboriú</option><option>Itapema</option><option>Porto Belo</option><option>Praia Brava (Itajaí)</option></datalist></div>
+        <div class="f full"><label for="c-obs">Observações</label><textarea id="c-obs" name="observacoes" rows="4" maxlength="4000"></textarea></div>
+       </div>
+      </fieldset>
+      <fieldset class="adm-box"><legend>Imóveis de interesse</legend>
+       <input type="search" id="c-imv-q" placeholder="Filtrar imóveis" autocomplete="off" class="crm-input">
+       <div class="imv-pick" id="c-imoveis"></div>
+      </fieldset>
+      <fieldset class="adm-box" id="cl-hist-box" hidden><legend>Histórico de atendimento</legend>
+       <div class="hist-add">
+        <label class="sr" for="h-tipo">Tipo</label>
+        <select id="h-tipo"><option value="ligacao">📞 Ligação</option><option value="whatsapp">💬 WhatsApp</option><option value="visita">🏠 Visita</option><option value="email">✉️ E-mail</option><option value="nota">📝 Anotação</option></select>
+        <label class="sr" for="h-texto">O que aconteceu</label>
+        <textarea id="h-texto" rows="2" maxlength="4000" placeholder="O que aconteceu? Ex.: Ligou, quer visitar no sábado às 10h."></textarea>
+        <button class="btn" type="button" id="b-hist">Registrar</button>
+       </div>
+       <ol class="hist" id="cl-hist"></ol>
+      </fieldset>
+     </div>
+     <aside class="adm-aside">
+      <div class="adm-box adm-sticky">
+       <h2>Atendimento</h2>
+       <div class="f"><label for="c-etapa">Etapa</label><select id="c-etapa" name="etapa"></select></div>
+       <div class="f" id="c-motivo-f" hidden><label for="c-motivo">Motivo da perda</label><input id="c-motivo" name="motivo_perda" maxlength="300" placeholder="Ex.: comprou com outra imobiliária"></div>
+       <div class="f"><label for="c-proximo">Próximo contato</label><input id="c-proximo" name="proximo_contato" type="date"></div>
+       <div class="f" id="c-corretor-f"><label for="c-corretor">Corretor responsável</label><select id="c-corretor" name="corretor_id"></select><small class="adm-help" id="c-corretor-help"></small></div>
+       <p class="adm-err" id="c-err" role="alert"></p>
+       <button class="btn" type="submit" id="b-cl-salvar">Salvar cliente</button>
+       <a class="btn line" id="b-cl-wa" href="#" target="_blank" rel="noopener" hidden>Abrir conversa no WhatsApp</a>
+       <button class="adm-linkbtn danger" type="button" id="b-cl-excluir" hidden>Excluir cliente</button>
+       <p class="muted adm-help" id="cl-meta"></p>
+      </div>
+     </aside>
+    </div>
+   </form>
+  </section>
+
+  <!-- ================= CRM: equipe ================= -->
+  <section id="s-equipe" hidden>
+   <div class="adm-head"><div><h1>Equipe</h1><p class="muted">Gestores veem e fazem tudo. Corretores veem só os próprios clientes e podem cadastrar e editar imóveis.</p></div></div>
+   <div class="adm-box dist">
+    <h2>Contatos que chegam pelo site</h2>
+    <p class="muted">Os formulários Comprar, Alugar e Anunciar do site criam o cliente aqui automaticamente.</p>
+    <div class="dist-opts" role="radiogroup" aria-label="Como distribuir os contatos do site">
+     <button type="button" class="dist-o" data-rodizio="true" role="radio"><b>🔄 Rodízio automático</b><span>Cada novo contato vai para o próximo corretor da vez (só quem está com "Rodízio" ligado).</span></button>
+     <button type="button" class="dist-o" data-rodizio="false" role="radio"><b>✋ Manual</b><span>Os contatos ficam em "Sem corretor" e você escolhe para quem enviar.</span></button>
+    </div>
+   </div>
+   <div class="adm-box">
+    <h2 id="eq-form-t">Adicionar pessoa à equipe</h2>
+    <ol class="steps">
+     <li>Crie o login da pessoa no Supabase: <b>Authentication › Users › Add user › Create new user</b> (e-mail, senha e <b>Auto Confirm User</b>).</li>
+     <li>Preencha abaixo com o <b>mesmo e-mail</b> e toque em <b>Salvar</b>. Passe o e-mail e a senha para a pessoa entrar em <b>/admin</b>.</li>
+    </ol>
+    <form id="f-equipe" novalidate>
+     <div class="fg">
+      <div class="f"><label for="eq-email">E-mail do login *</label><input id="eq-email" type="email" required maxlength="160"></div>
+      <div class="f"><label for="eq-nome">Nome *</label><input id="eq-nome" required maxlength="120"></div>
+      <div class="f"><label for="eq-tel">Telefone <span class="opt-hint">(opcional)</span></label><input id="eq-tel" type="tel" maxlength="30"></div>
+      <div class="f"><label for="eq-papel">Papel</label><select id="eq-papel"><option value="corretor">Corretor</option><option value="gestor">Gestor</option></select></div>
+     </div>
+     <label class="sw"><input type="checkbox" id="eq-rodizio" checked><span></span>Participa do rodízio de contatos do site</label>
+     <label class="sw"><input type="checkbox" id="eq-ativo" checked><span></span>Acesso ativo</label>
+     <p class="adm-err" id="eq-err" role="alert"></p>
+     <div class="adm-row" style="justify-content:flex-start"><button class="btn" type="submit">Salvar</button><button class="adm-linkbtn" type="button" id="eq-limpar">Limpar</button></div>
+    </form>
+   </div>
+   <ol class="adm-list" id="eq-list"></ol>
+  </section>
+
+  <!-- ================= CRM: painel do gestor ================= -->
+  <section id="s-painel" hidden>
+   <div class="adm-head"><div><h1>Painel</h1><p class="muted">Visão geral dos atendimentos.</p></div></div>
+   <div class="kpis" id="pn-kpis"></div>
+   <div class="adm-box"><h2>Por corretor</h2><div class="tbl-wrap"><table class="tbl" id="pn-tbl"></table></div></div>
+   <div class="adm-box" id="pn-sem-box"><h2>Aguardando distribuição</h2><p class="muted" id="pn-sem-vazio">Nenhum contato sem corretor.</p><ol class="adm-list" id="pn-sem"></ol></div>
+   <div class="adm-box"><h2>Retornos vencidos</h2><p class="muted" id="pn-atr-vazio">Nenhum retorno vencido. 👏</p><ol class="adm-list" id="pn-atr"></ol></div>
+  </section>
  </main>
 </div>
 
@@ -189,5 +312,6 @@
 <script src="../assets/js/core.js"></script>
 <script src="../assets/vendor/supabase-2.119.0.min.js"></script>
 <script src="../assets/js/admin.js"></script>
+<script src="../assets/js/crm.js"></script>
 </body>
 </html>

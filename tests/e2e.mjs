@@ -401,6 +401,91 @@ for (const [name, opts] of VIEWS) {
   await ctx.close();
 }
 
+/* ================= 8. CRM: equipe, contatos do site, corretores, histórico, painel ================= */
+console.log('\n8. CRM');
+{
+  const login = async (p, email, senha) => {
+    await p.goto(SITE + '/admin/'); await p.waitForSelector('#v-login:not([hidden]), #v-app:not([hidden])');
+    if (await p.locator('#v-login:not([hidden])').count()) { await p.fill('#l-email', email); await p.fill('#l-pass', senha); await p.click('#f-login button[type=submit]'); }
+    await p.waitForSelector('#v-app:not([hidden])'); await p.waitForSelector('#list .row');
+  };
+  const g = await page(); const P = g.p; P.on('dialog', d => d.accept());
+  await login(P, 'admin@teste.local', 'senha-admin-123');
+  ok(await P.locator('[data-tab=equipe]').isVisible() && await P.locator('[data-tab=painel]').isVisible(), 'gestor vê as abas Equipe e Painel');
+  await P.click('[data-tab=equipe]'); await P.waitForSelector('#s-equipe:not([hidden])');
+  P.__expectHttpErrors = true; // a recusa a seguir é proposital
+  await P.fill('#eq-email', 'naoexiste@teste.local'); await P.fill('#eq-nome', 'Fulano'); await P.click('#f-equipe button[type=submit]');
+  await P.waitForSelector('#eq-err:not(:empty)'); P.__expectHttpErrors = false; ok((await P.locator('#eq-err').innerText()).includes('Não existe login'), 'equipe: avisa quando o login ainda não foi criado no Supabase');
+  for (const [e, n] of [['joao@teste.local', 'João Corretor'], ['maria@teste.local', 'Maria Corretora']]) {
+    await P.click('#eq-limpar'); await P.fill('#eq-email', e); await P.fill('#eq-nome', n); await P.selectOption('#eq-papel', 'corretor');
+    await P.click('#f-equipe button[type=submit]'); await P.waitForFunction(n => document.querySelector('#eq-list').innerText.includes(n), n);
+  }
+  ok(await P.locator('#eq-list .row').count() === 3, 'equipe com gestor + 2 corretores');
+  await P.click('.dist-o[data-rodizio=true]'); await P.waitForSelector('.dist-o[data-rodizio=true].on');
+  ok(true, 'rodízio automático ligado');
+  await P.screenshot({ path: path.join(SHOTS, 'crm-equipe.png'), fullPage: true });
+
+  // contatos pelo site (visitante)
+  const v = await page(); const V = v.p;
+  const enviar = async (nome, fone) => {
+    await V.goto(SITE + '/'); await V.locator('#atendimento').scrollIntoViewIfNeeded();
+    await V.fill('#c-nome', nome); await V.fill('#c-wa', fone); await V.selectOption('#c-reg', 'Itapema'); await V.selectOption('#c-val', 'R$ 4 a 6 milhões');
+    await V.click('#p-comprar label.chip:has-text("Pronto")'); await V.check('#p-comprar [name=consent]'); await V.click('#p-comprar button[type=submit]');
+    await V.waitForSelector('#p-comprar .done:not([hidden])'); abriu += await V.evaluate(() => window.__opened.length); await sleep(600);
+  };
+  let abriu = 0;
+  await enviar('Lead Site Um', '47911110001'); await enviar('Lead Site Dois', '47911110002');
+  ok(abriu === 2, 'site: formulário continua abrindo o WhatsApp');
+  await P.click('[data-tab=clientes]'); await P.waitForFunction(() => document.querySelectorAll('#cl-list .row').length >= 2);
+  const linhas = await P.locator('#cl-list .row').allInnerTexts();
+  ok(linhas.some(t => t.includes('Lead Site Um') && t.includes('João')) && linhas.some(t => t.includes('Lead Site Dois') && t.includes('Maria')), 'rodízio: 1º contato para João, 2º para Maria');
+  ok(linhas.every(t => /SITE/i.test(t)), 'contatos do site marcados como "Site"');
+
+  // corretor João
+  const j = await page(); const J = j.p;
+  await login(J, 'joao@teste.local', 'senha-joao-123');
+  ok(!(await J.locator('[data-tab=equipe]').isVisible()) && !(await J.locator('[data-tab=painel]').isVisible()), 'corretor não vê Equipe nem Painel');
+  ok(await J.locator('#list [data-act=edit]').count() >= 1 && await J.locator('#list [data-act=del]').count() === 0, 'corretor edita imóveis, mas não exclui');
+  await J.click('[data-tab=clientes]'); await J.waitForFunction(() => document.querySelectorAll('#cl-list .row').length >= 1);
+  const jl = await J.locator('#cl-list .row').allInnerTexts();
+  ok(jl.length === 1 && jl[0].includes('Lead Site Um'), 'corretor vê só os próprios clientes');
+  await J.click('#b-novo-cliente'); await J.fill('#c-nome-c', 'Tentando Copiar'); await J.fill('#c-whatsapp', '(47) 91111-0002'); await J.click('#b-cl-salvar');
+  await J.waitForSelector('#cl-dup:not([hidden])');
+  const dup = await J.locator('#cl-dup').innerText();
+  ok(/bloqueado/i.test(dup) && dup.includes('Maria Corretora'), 'cliente de outro corretor: cadastro bloqueado mostrando quem atende');
+  await J.screenshot({ path: path.join(SHOTS, 'crm-bloqueio.png') });
+  await J.fill('#c-nome-c', 'Cliente Novo do João'); await J.fill('#c-whatsapp', '47922223333'); await J.selectOption('#c-etapa', 'visita');
+  await J.fill('#c-proximo', '2020-01-10'); await J.click('#b-cl-salvar'); await J.waitForSelector('#cl-hist-box:not([hidden])');
+  ok((await J.locator('#cl-titulo').innerText()) === 'Cliente Novo do João' && await J.inputValue('#c-proximo') === '2020-01-10' && await J.inputValue('#c-etapa') === 'visita', 'corretor cadastra cliente (etapa e próximo contato salvos)');
+  await J.selectOption('#h-tipo', 'ligacao'); await J.fill('#h-texto', 'Ligou, confirmou visita no sábado'); await J.click('#b-hist');
+  await J.waitForFunction(() => document.querySelector('#cl-hist').innerText.includes('confirmou visita'));
+  const hist = await J.locator('#cl-hist').innerText();
+  ok(hist.includes('Ligação') && hist.includes('Cliente cadastrado por João Corretor'), 'histórico com registro manual e automático');
+  ok((await J.locator('#c-corretor').isDisabled()), 'corretor não consegue transferir (campo bloqueado)');
+  await J.screenshot({ path: path.join(SHOTS, 'crm-ficha.png'), fullPage: true });
+
+  // gestor: manual, painel, distribuição, transferência
+  await P.click('[data-tab=equipe]'); await P.click('.dist-o[data-rodizio=false]'); await P.waitForSelector('.dist-o[data-rodizio=false].on');
+  await enviar('Lead Manual', '47911110009');
+  await P.click('[data-tab=painel]'); await P.waitForFunction(() => document.querySelector('#pn-kpis').children.length > 0 && document.querySelector('#pn-sem').innerText.includes('Lead Manual'));
+  ok((await P.locator('#pn-sem').innerText()).includes('Lead Manual'), 'modo manual: contato aguarda distribuição');
+  ok((await P.locator('#pn-atr').innerText()).includes('Cliente Novo do João'), 'painel: retorno vencido aparece');
+  ok((await P.locator('#pn-tbl').innerText()).includes('João Corretor'), 'painel: tabela por corretor');
+  await P.screenshot({ path: path.join(SHOTS, 'crm-painel.png'), fullPage: true });
+  await P.locator('#pn-sem .row', { hasText: 'Lead Manual' }).locator('[data-enviar]').selectOption({ label: 'João Corretor' });
+  await P.waitForFunction(() => !document.querySelector('#pn-sem').innerText.includes('Lead Manual'));
+  ok(true, 'gestor envia contato para um corretor');
+  await P.click('[data-tab=clientes]'); await P.waitForFunction(() => document.querySelector('#cl-list').innerText.includes('Cliente Novo do João'));
+  await P.locator('#cl-list .row', { hasText: 'Cliente Novo do João' }).locator('[data-abrir]').click();
+  await P.selectOption('#c-corretor', { label: 'Maria Corretora' }); await P.click('#b-cl-salvar');
+  await P.waitForFunction(() => document.querySelector('#cl-hist').innerText.includes('Transferido'));
+  ok((await P.locator('#cl-hist').innerText()).includes('Transferido de João Corretor para Maria Corretora'), 'transferência registrada no histórico');
+  await J.click('[data-tab=imoveis]'); await J.click('[data-tab=clientes]'); await J.waitForFunction(() => document.querySelector('#cl-list').innerText.includes('Lead Manual'));
+  const jl2 = await J.locator('#cl-list .row').allInnerTexts();
+  ok(jl2.some(t => t.includes('Lead Manual')) && !jl2.some(t => t.includes('Cliente Novo do João')), 'após transferência, João deixa de ver o cliente e recebe o enviado manualmente');
+  for (const x of [g, v, j]) await x.ctx.close();
+}
+
 /* ================= 7. limpeza: exclui os imóveis de teste pelo painel ================= */
 console.log('\n7. Exclusão');
 {

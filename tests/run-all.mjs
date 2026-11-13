@@ -4,7 +4,12 @@
 import { execSync, spawn } from 'node:child_process';
 const run = c => execSync(c, { stdio: 'inherit' });
 run('bash tests/local-supabase/setup.sh');
-run(`cd /tmp && su postgres -c "psql -q -t -d guarita_test -f '${process.cwd()}/tests/local-supabase/rls-test.sql'"`);
+for (const f of ['rls-test.sql', 'crm-test.sql']) {
+  run('bash tests/local-supabase/setup.sh');
+  const out = execSync(`cd /tmp && su postgres -c "psql -q -t -d guarita_test -f '${process.cwd()}/tests/local-supabase/${f}'" 2>&1`).toString();
+  console.log(out.split('\n').map(l => l.trim()).filter(l => /^OK|FALH|ERRO|ERROR/.test(l)).join('\n'));
+  if (/FALHOU|ERROR/.test(out)) { console.error(f + ': falhou'); process.exit(1); }
+}
 run('bash tests/local-supabase/setup.sh');
 // NODE_USE_ENV_PROXY: em ambientes com proxy de saída, a função /api/dwv precisa dele para acessar o DWV
 const srv = spawn('node', ['tests/local-supabase/server.mjs'], { stdio: 'inherit', env: { ...process.env, NODE_USE_ENV_PROXY: '1' } });

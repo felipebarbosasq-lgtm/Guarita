@@ -22,7 +22,7 @@ const DEMO = process.argv.includes('--demo');
 const STORE = path.join(process.env.STORE_DIR || '/tmp/guarita-storage');
 fs.mkdirSync(STORE, { recursive: true });
 // como o PostgREST, devolve numeric/bigint como número no JSON
-pg.types.setTypeParser(1700, v => v === null ? null : Number(v)); pg.types.setTypeParser(20, v => v === null ? null : Number(v));
+pg.types.setTypeParser(1700, v => v === null ? null : Number(v)); pg.types.setTypeParser(1082, v => v); // date como texto AAAA-MM-DD, igual ao PostgREST pg.types.setTypeParser(20, v => v === null ? null : Number(v));
 const pool = new pg.Pool({ host: '127.0.0.1', user: 'postgres', password: process.env.PGPASSWORD || 'postgres', database: process.env.PGDATABASE || 'guarita_test', max: 8 });
 
 /* ---------- JWT HS256 ---------- */
@@ -111,8 +111,11 @@ async function rest(req, res, url) {
     if (parts[0] === 'rpc') {
       const fn = ident(parts[1]), args = [], names = [];
       Object.entries(body || {}).forEach(([k, v]) => { args.push(v); names.push(`${ident(k)} => $${args.length}`); });
-      const r = await asUser(claims, c => c.query(`select public.${fn}(${names.join(',')}) as r`, args));
-      return send(res, 200, r.rows[0].r ?? null);
+      // como o PostgREST: função que retorna tabela -> lista de objetos; função escalar/void -> o valor
+      const r = await asUser(claims, c => c.query(`select * from public.${fn}(${names.join(',')})`, args));
+      const nome = parts[1];
+      if (r.fields.length === 1 && r.fields[0].name === nome) return send(res, 200, r.rows[0] ? (r.rows[0][nome] === '' ? null : r.rows[0][nome]) : null);
+      return send(res, 200, r.rows);
     }
     const table = ident(parts[0]), tt = await types(parts[0]);
     const val = (k, v) => tt[k] === 'jsonb' || tt[k] === 'json' ? JSON.stringify(v) : v;

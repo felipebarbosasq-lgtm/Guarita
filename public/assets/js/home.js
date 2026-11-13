@@ -218,6 +218,15 @@ $$('form.lead').forEach(form => {
     });
     const txt = `Olá! Vim pelo site da Guarita Imobiliária.\n\nInteresse: ${tipo}\n` + Object.entries(dataF).map(([k, v]) => `${k}: ${v}`).join('\n');
     const link = wa(txt); window.open(link, '_blank', 'noopener'); // abre a conversa já preenchida
+    // o contato também entra no CRM do painel (rodízio ou distribuição manual); se falhar, o WhatsApp já foi aberto
+    if (G.data.hasDB) {
+      const { Nome, WhatsApp, ...det } = dataF, k = CONFIG.supabaseAnonKey;
+      try {
+        fetch(`${CONFIG.supabaseUrl.replace(/\/$/, '')}/rest/v1/rpc/lead_do_site`, { method: 'POST', keepalive: true,
+          headers: { 'Content-Type': 'application/json', apikey: k, ...(/^eyJ/.test(k) ? { Authorization: `Bearer ${k}` } : {}) },
+          body: JSON.stringify({ p_nome: Nome || '', p_whatsapp: WhatsApp || '', p_interesse: tipo, p_detalhes: det }) }).catch(() => {});
+      } catch (_) {}
+    }
     if (CONFIG.leadCopyEndpoint) {
       try {
         fetch(CONFIG.leadCopyEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

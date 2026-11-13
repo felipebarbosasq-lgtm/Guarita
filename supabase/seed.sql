@@ -26,9 +26,11 @@ on conflict (slug) do nothing;
 -- Administradores: crie o usuário em Authentication > Users > Add user
 -- (e-mail e senha individuais) e depois autorize-o aqui, trocando o e-mail:
 --
---   insert into public.admins (user_id, email, nome)
---   select id, email, 'Nome da pessoa' from auth.users where email = 'pessoa@exemplo.com.br'
+--   insert into public.admins (user_id, email, nome, papel, recebe_rodizio)
+--   select id, email, 'Nome da pessoa', 'gestor', false from auth.users where email = 'pessoa@exemplo.com.br'
 --   on conflict (user_id) do nothing;
+--
+-- Depois disso, os demais (gestores e corretores) são cadastrados pelo próprio painel, na aba Equipe.
 --
 -- Para remover o acesso de alguém:
 --   delete from public.admins where email = 'pessoa@exemplo.com.br';

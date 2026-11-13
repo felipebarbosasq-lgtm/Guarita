@@ -10,7 +10,7 @@ if (!G.data.hasDB || !window.supabase) { show('v-nocfg'); return; }
 
 const sb = window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const BUCKET = CONFIG.storageBucket || 'imoveis';
-let user = null, all = [], ed = null, recovering = false;
+let user = null, all = [], ed = null, recovering = false, me = null;
 
 /* ---------- utilidades ---------- */
 let tt; function toast(msg, bad) { const t = $('#toast'); t.textContent = msg; t.classList.toggle('bad', !!bad); t.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('on'), bad ? 6000 : 3200); }
@@ -52,15 +52,18 @@ async function enter(session) {
   user = session && session.user;
   if (!user) { show('v-login'); $('#f-login').hidden = recovering; $('#f-reset').hidden = !recovering; return; }
   if (recovering) { show('v-login'); $('#f-login').hidden = true; $('#f-reset').hidden = false; $('#r-pass').focus(); return; }
-  const { data, error } = await sb.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
-  if (error || !data) { $('#d-email').textContent = user.email; show('v-denied'); return; }
-  $('#u-email').textContent = user.email;
+  const { data, error } = await sb.from('admins').select('*').eq('user_id', user.id).maybeSingle();
+  if (error || !data || data.ativo === false) { $('#d-email').textContent = user.email; show('v-denied'); return; }
+  me = data; me.gestor = !data.papel || data.papel === 'gestor'; // sem a atualização 3 do banco, todo administrador é gestor
+  $$('[data-gestor]').forEach(e => e.hidden = !me.gestor);
+  $('#u-email').textContent = (me.nome ? me.nome + ' · ' : '') + user.email;
   show('v-app');
   if (!all.length) await load();
+  document.dispatchEvent(new CustomEvent('guarita:pronto'));
 }
 sb.auth.onAuthStateChange((evt, session) => {
   if (evt === 'PASSWORD_RECOVERY') { recovering = true; enter(session); }
-  else if (evt === 'SIGNED_OUT') { user = null; all = []; show('v-login'); $('#f-login').hidden = false; $('#f-reset').hidden = true; }
+  else if (evt === 'SIGNED_OUT') { user = null; all = []; me = null; document.dispatchEvent(new CustomEvent('guarita:saiu')); show('v-login'); $('#f-login').hidden = false; $('#f-reset').hidden = true; }
 });
 $('#f-login').addEventListener('submit', async e => {
   e.preventDefault();
@@ -118,7 +121,7 @@ function renderList() {
        <button type="button" class="ib" data-act="down" aria-label="Descer ${esc(i.nome)}" ${nextSame ? '' : 'disabled'}>↓</button>
        ${i.publicado ? `<a class="ib" href="${esc(G.imovelUrl(i))}" target="_blank" rel="noopener" aria-label="Ver ${esc(i.nome)} no site" title="Ver no site">↗</a>` : ''}
        <button type="button" class="ib" data-act="edit" aria-label="Editar ${esc(i.nome)}" title="Editar">✎</button>
-       <button type="button" class="ib danger" data-act="del" aria-label="Excluir ${esc(i.nome)}" title="Excluir">🗑</button>
+       ${me && me.gestor ? `<button type="button" class="ib danger" data-act="del" aria-label="Excluir ${esc(i.nome)}" title="Excluir">🗑</button>` : ''}
       </div></li>`;
   }).join('');
 }
@@ -192,7 +195,7 @@ function openEditor(im) {
   F('publicado').checked = !!im.publicado; F('destaque').checked = !!im.destaque;
   $$('#f-edit .bad').forEach(x => x.classList.remove('bad')); $$('#f-edit .err, #e-err, #ph-err').forEach(x => x.textContent = '');
   $('#e-title').textContent = isNew ? 'Novo imóvel' : `Editar: ${im.nome}`;
-  $('#b-del').hidden = isNew;
+  $('#b-del').hidden = isNew || !(me && me.gestor);
   $('#b-view').hidden = isNew || !im.publicado; $('#b-view').href = G.imovelUrl(im);
   $('#s-list').hidden = true; $('#s-edit').hidden = false; scrollTo(0, 0);
   renderPhotos(); preview(); F('nome').focus();
@@ -393,6 +396,17 @@ async function addFiles(list) {
   if (errs.length) $('#ph-err').textContent = 'Algumas fotos não foram aceitas: ' + errs.join('; ') + '.';
   else toast(`${items.length} ${items.length === 1 ? 'foto enviada' : 'fotos enviadas'}. Clique em Salvar para gravar o imóvel.`);
 }
+
+/* ---------- compartilhado com o CRM (crm.js) ---------- */
+window.GuaritaAdmin = {
+  sb, toast, confirmBox, errMsg,
+  get me() { return me; }, get user() { return user; }, get imoveis() { return all; },
+  /* sair da edição de imóvel antes de trocar de aba */
+  async liberar() {
+    if (ed && (ed.dirty || ed.busy) && !(await confirmBox('Sair sem salvar o imóvel?', 'As alterações deste imóvel ainda não foram salvas.', 'Sair'))) return false;
+    await discardUploads(); ed = null; $('#s-edit').hidden = true; renderList(); return true;
+  }
+};
 
 /* ---------- importar do DWV (link de compartilhamento) ---------- */
 $('#b-dwv').onclick = async () => {
