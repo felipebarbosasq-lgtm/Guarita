@@ -86,6 +86,16 @@
    <form id="f-edit" novalidate>
     <div class="adm-edit">
      <div class="adm-form">
+      <fieldset class="adm-box adm-import"><legend>Importar do DWV</legend>
+       <p class="adm-help">Cole aqui o <b>link de compartilhamento do DWV</b> (ou a mensagem inteira que o DWV gera) e toque em <b>Importar</b>. Os dados, a descrição e todas as fotos entram sozinhos; depois é só conferir e salvar.</p>
+       <div class="imp-row">
+        <label class="sr" for="dwv-texto">Link ou mensagem do DWV</label>
+        <textarea id="dwv-texto" rows="2" placeholder="https://lp.dwvapp.com.br/..."></textarea>
+        <button class="btn gold" type="button" id="b-dwv">Importar do DWV</button>
+       </div>
+       <p class="adm-err" id="dwv-err" role="alert"></p>
+       <p class="imp-status" id="dwv-status" role="status" aria-live="polite"></p>
+      </fieldset>
       <fieldset class="adm-box"><legend>Identificação</legend>
        <div class="fg">
         <div class="f full"><label for="e-nome">Nome do empreendimento *</label><input id="e-nome" name="nome" required maxlength="120"><span class="err"></span></div>

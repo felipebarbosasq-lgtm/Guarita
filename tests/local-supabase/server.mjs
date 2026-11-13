@@ -247,6 +247,7 @@ process.env.SUPABASE_URL = DEMO ? '' : API; process.env.SUPABASE_ANON_KEY = DEMO
 globalThis.Netlify = { env: { get: k => process.env[k] } };
 const sitemapFn = (await import(path.join(ROOT, 'netlify/functions/sitemap.mjs'))).default;
 const metaFn = (await import(path.join(ROOT, 'netlify/edge-functions/imovel-meta.js'))).default;
+const dwvFn = (await import(path.join(ROOT, 'netlify/functions/dwv.mjs'))).default;
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.txt': 'text/plain', '.xml': 'application/xml', '.svg': 'image/svg+xml' };
 function serveFile(file, status = 200) {
   let body = fs.readFileSync(file);
@@ -261,6 +262,7 @@ async function site(req) {
   const url = new URL(req.url);
   let p = decodeURIComponent(url.pathname);
   if (p === '/sitemap.xml') return sitemapFn(req);
+  if (p === '/api/dwv') return dwvFn(req);
   if (p === '/admin') return new Response(null, { status: 301, headers: { Location: '/admin/' } });
   if (p.startsWith('/imovel/')) return metaFn(req, { next: async () => serveFile(path.join(PUB, 'imovel', 'index.html')) });
   if (p.endsWith('/')) p += 'index.html';
@@ -270,7 +272,8 @@ async function site(req) {
 }
 http.createServer(async (req, res) => {
   try {
-    const r = await site(new Request(`http://127.0.0.1:${SITE_PORT}${req.url}`, { method: req.method }));
+    const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req) : undefined;
+    const r = await site(new Request(`http://127.0.0.1:${SITE_PORT}${req.url}`, { method: req.method, headers: req.headers, body }));
     res.writeHead(r.status, Object.fromEntries(r.headers)); res.end(Buffer.from(await r.arrayBuffer()));
   } catch (e) { console.error(e); res.writeHead(500); res.end(String(e)); }
 }).listen(SITE_PORT, '127.0.0.1', () => console.log(`Site: http://127.0.0.1:${SITE_PORT}  (${DEMO ? 'modo demonstração' : 'Supabase local em ' + API})`));

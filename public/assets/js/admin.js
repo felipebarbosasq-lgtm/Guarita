@@ -394,6 +394,53 @@ async function addFiles(list) {
   else toast(`${items.length} ${items.length === 1 ? 'foto enviada' : 'fotos enviadas'}. Clique em Salvar para gravar o imóvel.`);
 }
 
+/* ---------- importar do DWV (link de compartilhamento) ---------- */
+$('#b-dwv').onclick = async () => {
+  if (!ed) return;
+  const texto = $('#dwv-texto').value.trim(), err = $('#dwv-err'), st = $('#dwv-status'), b = $('#b-dwv');
+  err.textContent = ''; st.textContent = '';
+  if (!/lp\.dwvapp\.com\.br\//i.test(texto)) { err.textContent = 'Cole o link de compartilhamento do DWV (começa com https://lp.dwvapp.com.br/).'; $('#dwv-texto').focus(); return; }
+  if (F('nome').value.trim() && !(await confirmBox('Substituir os dados?', 'Os campos deste cadastro serão preenchidos com os dados do DWV. As fotos do DWV serão adicionadas às que já estão aqui.', 'Importar'))) return;
+  b.disabled = true; b.textContent = 'Importando…'; st.textContent = 'Lendo o anúncio no DWV…';
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    let r;
+    try { r = await fetch('/api/dwv', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (session && session.access_token) }, body: JSON.stringify({ texto }) }); }
+    catch (_) { throw new Error('Sem conexão. Verifique a internet e tente de novo.'); }
+    const out = await r.json().catch(() => ({ erro: r.status === 404 ? 'A importação só funciona no site publicado no Netlify.' : 'Resposta inválida do servidor.' }));
+    if (!r.ok) throw new Error(out.erro || 'Não foi possível importar.');
+    const im = out.imovel;
+    ['nome', 'complemento', 'tipo', 'finalidade', 'status', 'endereco', 'bairro', 'cidade', 'estado', 'descricao', 'info_complementar'].forEach(k => { if (im[k] != null) F(k).value = im[k]; });
+    F('valor').value = money(im.valor); F('area_privativa').value = dec(im.area_privativa); F('area_total').value = dec(im.area_total);
+    INT.forEach(k => F(k).value = im[k] == null ? '' : im[k]);
+    F('caracteristicas').value = (im.caracteristicas || []).join('\n');
+    if (!ed.slugTouched || !F('slug').value) { ed.slugTouched = false; F('slug').value = slugify([im.nome, im.tipo, im.complemento].filter(Boolean).join(' ')); }
+    ed.dirty = true; preview();
+    /* fotos: baixadas direto do DWV pelo navegador e otimizadas/enviadas como num envio normal */
+    const urls = (out.fotos || []).slice(0, Math.max(0, 60 - ed.fotos.length)), files = [];
+    let feitos = 0, falhas = 0, next = 0;
+    st.textContent = `Dados preenchidos. Baixando ${urls.length} fotos do DWV…`;
+    const baixar = async () => {
+      while (next < urls.length) {
+        const k = next++;
+        try {
+          const res = await fetch(urls[k], { mode: 'cors' }); if (!res.ok) throw new Error();
+          const blob = await res.blob(); files[k] = new File([blob], urls[k].split('/').pop() || `foto-${k + 1}.jpg`, { type: blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg' });
+        } catch (_) { falhas++; }
+        st.textContent = `Dados preenchidos. Baixando fotos do DWV: ${++feitos} de ${urls.length}…`;
+      }
+    };
+    await Promise.all([baixar(), baixar(), baixar(), baixar()]);
+    const ok = files.filter(Boolean);
+    if (ok.length) { st.textContent = `Otimizando e salvando ${ok.length} fotos…`; await addFiles(ok); }
+    const faltou = (out.fotos || []).length - urls.length;
+    st.textContent = `✓ Importado do DWV: ${ok.length} ${ok.length === 1 ? 'foto' : 'fotos'}${falhas ? ` (${falhas} não baixaram)` : ''}${faltou > 0 ? ` (${faltou} ficaram de fora: limite de 60 por imóvel)` : ''}. Confira os dados${im.bairro ? '' : ', preencha o bairro'}, escolha a capa e toque em Salvar. O imóvel só aparece no site quando você ligar "Publicado no site".`;
+    if (!im.bairro) { F('bairro').classList.add('bad'); }
+  } catch (e) {
+    err.textContent = e.message; st.textContent = '';
+  } finally { b.disabled = false; b.textContent = 'Importar do DWV'; }
+};
+
 /* ---------- início ---------- */
 (async () => {
   if (/type=recovery/.test(location.hash)) recovering = true;

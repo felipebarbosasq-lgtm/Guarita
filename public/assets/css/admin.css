@@ -106,3 +106,10 @@
 .adm-help{display:block;margin-top:6px;font-size:13px;color:var(--muted);line-height:1.4}
 .sw-opo input:checked+span{background:var(--gold)}
 .pill.opo-p[aria-pressed=true]{background:var(--gold2);border-color:var(--gold2);color:#0d0c0a}
+.adm-import{border-color:rgba(181,138,60,.55);background:linear-gradient(180deg,#fffaf0,#fff)}
+.imp-row{display:flex;gap:12px;align-items:stretch;margin-top:12px}
+.imp-row textarea{flex:1;min-height:52px;padding:12px 14px;border:1px solid #d6ccba;background:#fff;border-radius:2px;font-size:16px;resize:vertical}
+.imp-row textarea:focus{outline:0;border-color:var(--gold);box-shadow:0 0 0 3px rgba(181,138,60,.16)}
+.imp-row .btn{flex:none}
+.imp-status{font-size:14.5px;color:#3b352b;margin-top:10px}.imp-status:empty{display:none}
+@media(max-width:560px){.imp-row{flex-direction:column}}

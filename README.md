@@ -150,6 +150,14 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
 - **Fotos:** selecione ou arraste várias de uma vez (JPG, PNG, WebP, HEIC; até 30 MB; mínimo 800 px no lado maior).
   O painel valida, corrige a rotação, reduz para 1920 px, 960 px e miniatura de 400 px em WebP, envia ao Supabase e
   monta a galeria. Nunca corta, estica ou amplia. A primeira foto é a capa (★ escolhe outra; setas ou arrastar mudam a ordem).
+- **Importar do DWV:** em *+ Novo imóvel*, cole o link de compartilhamento do DWV (`lp.dwvapp.com.br/...`) ou a mensagem
+  inteira e toque em **Importar do DWV**. Nome, unidade, tipo, endereço, bairro (quando vem na mensagem), valor, áreas,
+  quartos, suítes, banheiros, vagas, características, condomínio, uma descrição montada com esses dados e todas as fotos
+  são preenchidos; as fotos são otimizadas e guardadas no Supabase do site. Confira, escolha a capa, ligue *Publicado* e salve.
+  Dados pessoais do corretor que compartilhou não são importados. A leitura usa a página pública de compartilhamento
+  (função `netlify/functions/dwv.mjs`, só para administradores logados), não a API oficial do DWV: se o DWV mudar a
+  página, a importação avisa e o cadastro manual continua funcionando. Preços alterados depois no DWV não se atualizam sozinhos.
+  Confirme com a construtora/corretora se o imóvel pode ser divulgado no seu site.
 - **Oportunidade:** ligue "Oportunidade" no imóvel (ou o botão *Oportunidade* na lista) para mostrar no site uma
   faixa dourada com a palavra **OPORTUNIDADE** em preto, com um pulso discreto. Para mostrar desconto, preencha
   **Valor anterior "de"**: o site exibe ~~De R$ 470.000,00~~ **Por R$ 350.000,00** (o "de" precisa ser maior que o valor atual).

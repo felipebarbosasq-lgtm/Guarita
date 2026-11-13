@@ -29,7 +29,9 @@ Image.new('RGB',(500,400),(0,0,0)).save('${FIX}/pequena.jpg')
 open('${FIX}/texto.jpg','w').write('isto não é uma imagem')
 `]);
 
-const browser = await chromium.launch();
+// em ambientes com proxy de saída (HTTPS_PROXY), o navegador de teste usa o mesmo proxy para acessar o DWV
+const PROXY = process.env.HTTPS_PROXY || process.env.https_proxy;
+const browser = await chromium.launch(PROXY ? { proxy: { server: PROXY, bypass: '127.0.0.1,localhost' } } : {});
 const errors = [];
 async function page(ctxOpts = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, ...ctxOpts });
@@ -234,6 +236,44 @@ let novoSlug = '';
   await p.reload(); await p.waitForSelector('#list .row');
   const after2 = await p.locator('#list .row .nm b').allInnerTexts();
   ok(JSON.stringify(after2) === JSON.stringify(after), 'ordem e dados persistem após recarregar');
+  await ctx.close();
+}
+
+/* ================= 3b. importar do DWV pelo link de compartilhamento ================= */
+console.log('\n3b. Importar do DWV');
+{
+  const r0 = await fetch(SITE + '/api/dwv', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto: 'https://lp.dwvapp.com.br/fd7d188224ef41db8d34048b105b2903' }) });
+  ok(r0.status === 401, 'importação recusada para quem não está logado (' + r0.status + ')');
+  const { ctx, p } = await page();
+  await p.goto(SITE + '/admin/'); await p.waitForSelector('#v-login:not([hidden])');
+  await p.fill('#l-email', 'admin@teste.local'); await p.fill('#l-pass', 'senha-admin-123'); await p.click('#f-login button[type=submit]');
+  await p.waitForSelector('#list .row'); await p.click('#b-new');
+  await p.fill('#dwv-texto', 'qualquer coisa'); await p.click('#b-dwv');
+  ok((await p.locator('#dwv-err').innerText()).includes('lp.dwvapp.com.br'), 'avisa quando o texto não tem link do DWV');
+  const msg = `*Unidade: Torre de Lyon*\n*Valor*: R$ 3.150.000,00\n\nRua Miguel Matte 252, Centro Bal. Camboriú/SC\n\nAtenciosamente,\nFernanda\n\n https://lp.dwvapp.com.br/fd7d188224ef41db8d34048b105b2903`;
+  await p.fill('#dwv-texto', msg);
+  const t0 = Date.now();
+  await p.click('#b-dwv');
+  await p.waitForFunction(() => /Importado do DWV|não/i.test(document.querySelector('#dwv-status').textContent + document.querySelector('#dwv-err').textContent), null, { timeout: 300000 });
+  const st = await p.locator('#dwv-status').innerText(), er = await p.locator('#dwv-err').innerText();
+  ok(!er && st.startsWith('✓ Importado do DWV'), 'importação concluída em ' + Math.round((Date.now() - t0) / 1000) + ' s: ' + (er || st.slice(0, 60)));
+  const v = k => p.inputValue('#e-' + k);
+  ok(await v('nome') === 'Torre de Lyon' && await v('complemento') === '102' && await v('tipo') === 'Apartamento' && await v('bairro') === 'Centro' && await v('cidade') === 'Balneário Camboriú' && await v('endereco') === 'Rua Miguel Matte, 252', 'nome, unidade, tipo, endereço, bairro e cidade preenchidos');
+  ok(await v('valor') === '3.150.000,00' && await v('area_privativa') === '216,69' && await v('dormitorios') === '3' && await v('suites') === '3' && await v('banheiros') === '4' && await v('vagas') === '3', 'valor, área, dormitórios, suítes, banheiros e vagas preenchidos');
+  const car = await v('caracteristicas');
+  ok(car.includes('Churrasqueira') && car.includes('Piscina com 3 raias') && car.includes('Mobiliado e equipado'), 'características da unidade e do empreendimento');
+  ok((await v('descricao')).startsWith('Apartamento 102 no Torre de Lyon, no bairro Centro') && (await v('info_complementar')).includes('Condomínio: R$ 2.072,59'), 'descrição e condomínio montados');
+  const nf = await p.locator('#photos .ph-i').count();
+  ok(nf === 49, 'todas as fotos do DWV importadas e otimizadas: ' + nf);
+  ok((await p.content()).includes('Fernanda') === false || !(await v('descricao')).includes('Fernanda'), 'dados da corretora não entram no cadastro');
+  await p.click('#b-save'); await p.waitForSelector('#b-del:not([hidden])');
+  ok((await p.locator('#toast').innerText()).includes('Imóvel cadastrado'), 'imóvel importado salvo (não publicado)');
+  const src = await p.locator('#pv img').getAttribute('src');
+  ok(src.includes('/storage/v1/object/public/imoveis/'), 'fotos guardadas no armazenamento do site, não no DWV');
+  await p.screenshot({ path: path.join(SHOTS, 'admin-importar-dwv.png'), fullPage: true });
+  await p.click('#b-del'); await p.waitForSelector('#modal:not([hidden])'); await p.click('#m-yes');
+  await p.waitForFunction(() => !document.querySelector('#s-list').hidden);
+  ok(true, 'imóvel de teste importado excluído');
   await ctx.close();
 }
 
