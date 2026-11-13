@@ -103,3 +103,6 @@
  .adm-user span{display:none}
 }
 @media(max-width:560px){.adm .fg{grid-template-columns:1fr}.adm .fg4{grid-template-columns:1fr 1fr}}
+.adm-help{display:block;margin-top:6px;font-size:13px;color:var(--muted);line-height:1.4}
+.sw-opo input:checked+span{background:var(--gold)}
+.pill.opo-p[aria-pressed=true]{background:var(--gold2);border-color:var(--gold2);color:#0d0c0a}

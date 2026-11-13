@@ -75,6 +75,13 @@ create table if not exists public.imoveis (
   constraint suites_ate_dormitorios check (suites is null or dormitorios is null or suites <= dormitorios)
 );
 
+-- oportunidade e preço "de/por" (atualização 2; também em supabase/atualizacao-02-oportunidade.sql)
+alter table public.imoveis add column if not exists oportunidade boolean not null default false;
+alter table public.imoveis add column if not exists valor_anterior numeric(14, 2);
+alter table public.imoveis drop constraint if exists valor_anterior_maior;
+alter table public.imoveis add constraint valor_anterior_maior
+  check (valor_anterior is null or (valor_anterior > 0 and (valor is null or valor_anterior > valor)));
+
 create index if not exists imoveis_publicos_idx on public.imoveis (publicado, destaque desc, ordem, created_at desc);
 
 create or replace function public.imoveis_touch()

@@ -39,8 +39,8 @@ function render(im) {
   $('#im-loc').textContent = fmt.loc(im);
   $('#im-nome').textContent = im.nome;
   $('#im-unit').textContent = fmt.unit(im);
-  $('#im-preco').textContent = fmt.price(im);
-  $('#im-plabel').textContent = fmt.priceLabel(im);
+  $('#im-preco').innerHTML = fmt.priceHTML(im); $('#im-preco').classList.toggle('deal', !!fmt.oldPrice(im));
+  if (im.oportunidade) $('#im-opo').hidden = false;
   $('#im-ref').textContent = im.codigo ? `Referência ${im.codigo}` : '';
   const st = fmt.status(im); if (st) { $('#im-status').textContent = st; $('#im-status').hidden = false; }
   const link = wa(waMsg(im));
@@ -70,7 +70,7 @@ function render(im) {
     const alt = (f, k) => f.alt || `${title}: foto ${k + 1} de ${fotos.length}`;
     const side = fotos.slice(1, 5);
     gal.className = 'gal n' + Math.min(fotos.length, 5);
-    gal.innerHTML = `<button type="button" class="g0" data-i="0" aria-label="Abrir galeria: foto 1 de ${fotos.length}"><img src="${esc(src(fotos[0].lg))}" srcset="${esc(src(fotos[0].md || fotos[0].lg))} 720w, ${esc(src(fotos[0].lg))} 1280w" sizes="(max-width:860px) 100vw, 760px" alt="${esc(alt(fotos[0], 0))}" width="${fotos[0].w || 1280}" height="${fotos[0].h || 853}" fetchpriority="high"></button>`
+    gal.innerHTML = `<button type="button" class="g0" data-i="0" aria-label="Abrir galeria: foto 1 de ${fotos.length}"><img src="${esc(src(fotos[0].lg))}" srcset="${esc(src(fotos[0].md || fotos[0].lg))} 720w, ${esc(src(fotos[0].lg))} 1280w" sizes="(max-width:860px) 100vw, 760px" alt="${esc(alt(fotos[0], 0))}" width="${fotos[0].w || 1280}" height="${fotos[0].h || 853}" fetchpriority="high">${im.oportunidade ? '<span class="opo" aria-hidden="true"><i></i>Oportunidade</span>' : ''}</button>`
       + side.map((f, k) => `<button type="button" data-i="${k + 1}" aria-label="Abrir galeria: foto ${k + 2} de ${fotos.length}"><img src="${esc(src(f.md || f.lg))}" alt="${esc(alt(f, k + 1))}" width="${f.w || 1280}" height="${f.h || 853}" loading="lazy" decoding="async"></button>`).join('')
       + (fotos.length > 1 ? `<button type="button" class="g-all" data-i="0">Ver as ${fotos.length} fotos</button>` : '');
     gal.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) openLB(+b.dataset.i); });

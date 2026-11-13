@@ -126,7 +126,13 @@ No Supabase, **Authentication > URL Configuration**: em **Site URL** coloque o e
 - `/sitemap.xml` é gerado na hora com os imóveis publicados.
 Para redirecionar endereços antigos, acrescente blocos `[[redirects]]` no `netlify.toml`.
 
-### 3.6 Publicar atualizações futuras
+### 3.6 Atualizações do banco
+Quando uma novidade precisar de campos novos no banco, ela vem num arquivo `supabase/atualizacao-NN-*.sql`.
+Rode cada um **uma vez**, em ordem, no **SQL Editor** do Supabase (*New query > colar > Run*). Eles não apagam dados.
+- `atualizacao-02-oportunidade.sql`: selo Oportunidade e preço "de/por".
+Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizações) e do `seed.sql`.
+
+### 3.7 Publicar atualizações futuras
 - **Imóveis:** pelo painel. Não é preciso republicar o site: as mudanças aparecem na hora.
 - **Textos, telefones, design:** edite os arquivos, faça *commit* no GitHub (o Netlify publica sozinho)
   ou rode `netlify deploy --build --prod`. WhatsApp, e-mail, Instagram e CRECI ficam em `public/assets/js/config.js`.
@@ -144,6 +150,9 @@ Para redirecionar endereços antigos, acrescente blocos `[[redirects]]` no `netl
 - **Fotos:** selecione ou arraste várias de uma vez (JPG, PNG, WebP, HEIC; até 30 MB; mínimo 800 px no lado maior).
   O painel valida, corrige a rotação, reduz para 1920 px, 960 px e miniatura de 400 px em WebP, envia ao Supabase e
   monta a galeria. Nunca corta, estica ou amplia. A primeira foto é a capa (★ escolhe outra; setas ou arrastar mudam a ordem).
+- **Oportunidade:** ligue "Oportunidade" no imóvel (ou o botão *Oportunidade* na lista) para mostrar no site uma
+  faixa dourada com a palavra **OPORTUNIDADE** em preto, com um pulso discreto. Para mostrar desconto, preencha
+  **Valor anterior "de"**: o site exibe ~~De R$ 470.000,00~~ **Por R$ 350.000,00** (o "de" precisa ser maior que o valor atual).
 - **Excluir** pede confirmação e apaga também as fotos enviadas.
 - Formatação automática para todos os anúncios: R$ 1.234.567,00, áreas em m², singular/plural, mesmo cartão e mesma página.
 
@@ -157,20 +166,18 @@ Para redirecionar endereços antigos, acrescente blocos `[[redirects]]` no `netl
 - Nenhuma senha ou chave privada fica no código. `.env` está no `.gitignore`.
 
 ## 6. Banner e créditos das fotografias
-O banner tem 4 paisagens reais de Balneário Camboriú, do Wikimedia Commons, com licença para uso comercial e
-atribuição (os créditos ficam no rodapé, em "Créditos das fotografias", e precisam continuar lá):
+O banner tem 3 fotos de Balneário Camboriú enviadas pela Guarita (Barra Sul e marina, Praia Central com a
+roda-gigante e entardecer na Barra Sul). Os originais tinham entre 720 e 1200 px; foram ampliados 4 vezes com
+inteligência artificial (Real-ESRGAN, `tools/ampliar_fotos.py`) e misturados a 20% de uma ampliação tradicional
+para manter a textura natural. Depois, `tools/hero_images.py` cria versões de 1280 a 3840 px para computador e um
+recorte vertical (9:16) para celular, sem bordas pretas e sem deformar.
 
-| # | Foto | Autor | Licença | Maior versão usada |
-|---|---|---|---|---|
-| 1 | [Vista aérea da Praia Central (Parque Unipraias)](https://commons.wikimedia.org/wiki/File:Balne%C3%A1rio_Cambori%C3%BA_from_Unipraias_Park_2023-04-02.jpg) | Trustable | CC BY-SA 4.0 | 3840 px |
-| 2 | [Skyline visto do mar](https://commons.wikimedia.org/wiki/File:Balneario_Camboriu_Skyline_from_the_Sea_2019.jpg) | Hayden Soloviev | CC BY 4.0 | 3840 px |
-| 3 | [Pôr do sol na orla](https://commons.wikimedia.org/wiki/File:Balne%C3%A1rio_Cambori%C3%BA_-_SC_-_Brasil_-_panoramio.jpg) | caetano051068 | CC BY-SA 3.0 | 3840 px |
-| 4 | [Orla iluminada à noite](https://commons.wikimedia.org/wiki/File:1_Camboriu_angeloleithold_py5aal.JPG) | Angeloleithold | CC BY 3.0 | 3296 px (resolução original) |
+**Direitos de uso:** confirme que a Guarita tem autorização para usar comercialmente essas três fotos (se vieram da
+internet, o autor precisa autorizar).
 
-Cada foto tem versões de 1280 a 3840 px para computador e um recorte vertical (9:16) para celular, centrado nos
-edifícios. Nenhuma foi ampliada além do tamanho original. Para trocar uma foto, coloque os originais como
-`1.jpg`…`4.jpg` numa pasta, ajuste os dados em `tools/hero_images.py` e rode `python3 tools/hero_images.py PASTA`
-(requer Python 3 e Pillow); o script atualiza o HTML e os créditos.
+Para trocar as fotos: amplie com `tools/ampliar_fotos.py` (instruções no início do arquivo), salve como
+`1.jpg`, `2.jpg`… numa pasta, ajuste a lista `HERO` em `tools/hero_images.py` e rode
+`python3 tools/hero_images.py PASTA`. O script atualiza o HTML e os créditos.
 
 Fotos das regiões: Wikimedia Commons (créditos no rodapé). Fotos do Eleganza Tower, roda-gigante e fundador: acervo da Guarita.
 Fontes: Cormorant Garamond e Jost, SIL Open Font License 1.1 (arquivos em `public/assets/fonts`).

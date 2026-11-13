@@ -109,6 +109,7 @@
       <fieldset class="adm-box"><legend>Valor e áreas</legend>
        <div class="fg">
         <div class="f"><label for="e-valor" id="lbl-valor">Valor (R$)</label><input id="e-valor" name="valor" inputmode="decimal" placeholder="Ex.: 7.519.000,00"><span class="err"></span></div>
+        <div class="f"><label for="e-valor_anterior">Valor anterior, "de" (R$) <span class="opt-hint">(opcional)</span></label><input id="e-valor_anterior" name="valor_anterior" inputmode="decimal" placeholder="Ex.: 470.000,00"><span class="err"></span><small class="adm-help">Preencha para mostrar no site: <s>De R$ 470.000,00</s> Por R$ 350.000,00. Deixe vazio para mostrar só o valor.</small></div>
         <div class="f"><label for="e-area_privativa">Área privativa (m²)</label><input id="e-area_privativa" name="area_privativa" inputmode="decimal"><span class="err"></span></div>
         <div class="f"><label for="e-area_total">Área total (m²), quando houver</label><input id="e-area_total" name="area_total" inputmode="decimal"><span class="err"></span></div>
        </div>
@@ -148,6 +149,7 @@
        <h2>Publicação</h2>
        <label class="sw"><input type="checkbox" name="publicado" id="e-publicado"><span></span>Publicado no site</label>
        <label class="sw"><input type="checkbox" name="destaque" id="e-destaque"><span></span>Em destaque (aparece primeiro)</label>
+       <label class="sw sw-opo"><input type="checkbox" name="oportunidade" id="e-oportunidade"><span></span>Oportunidade (faixa dourada no anúncio)</label>
        <div class="f"><label for="e-slug">Endereço da página</label><div class="slug"><span>/imovel/</span><input id="e-slug" name="slug" maxlength="120" pattern="[a-z0-9]+(-[a-z0-9]+)*"></div><span class="err"></span></div>
        <p class="adm-err" id="e-err" role="alert"></p>
        <button class="btn" type="submit" id="b-save">Salvar</button>

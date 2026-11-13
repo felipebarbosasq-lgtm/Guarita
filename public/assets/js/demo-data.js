@@ -16,6 +16,8 @@ window.GUARITA_DEMO = [
   "cidade": "Balneário Camboriú",
   "estado": "SC",
   "valor": 7519000,
+  "valor_anterior": null,
+  "oportunidade": false,
   "area_privativa": 140,
   "area_total": null,
   "dormitorios": 4,

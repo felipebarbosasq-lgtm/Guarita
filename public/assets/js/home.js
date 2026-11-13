@@ -64,7 +64,7 @@ function Carousel(root) {
     step = first + gap; setW = step * count;
     const sets = 3 + Math.ceil(vp.clientWidth / setW);
     let html = '';
-    for (let s = 0; s < sets; s++) html += s === 1 ? one : one.replace(/<article class="prop"/g, '<article class="prop" aria-hidden="true"').replace(/<a class="btn"/g, '<a class="btn" tabindex="-1"'); // cópias: clicáveis, fora do Tab e do leitor de tela
+    for (let s = 0; s < sets; s++) html += s === 1 ? one : one.replace(/<article class="prop/g, '<article aria-hidden="true" class="prop').replace(/<a class="btn"/g, '<a class="btn" tabindex="-1"'); // cópias: clicáveis, fora do Tab e do leitor de tela
     track.innerHTML = html;
     x = keep !== null ? keep * setW : -setW; norm(); paint();
     if (!raf) { last = now(); raf = requestAnimationFrame(loop); }

@@ -30,6 +30,8 @@ function errMsg(e) {
   const m = (e && (e.message || e.error_description || e.msg)) || String(e);
   if (/duplicate key.*slug/i.test(m) || /imoveis_slug_key/.test(m)) return 'Já existe outro imóvel com este endereço de página. Altere o campo "Endereço da página".';
   if (/duplicate key.*codigo/i.test(m) || /imoveis_codigo_key/.test(m)) return 'Já existe outro imóvel com este código de referência.';
+  if (/oportunidade|valor_anterior/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem os campos de Oportunidade. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-02-oportunidade.sql (uma vez só).';
+  if (/valor_anterior_maior/.test(m)) return 'O valor anterior ("de") precisa ser maior que o valor atual.';
   if (/row-level security|permission denied|42501|acesso negado/i.test(m)) return 'Sua conta não tem permissão para esta ação.';
   if (/JWT|session/i.test(m)) return 'Sua sessão expirou. Entre novamente.';
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com o servidor. Verifique a internet e tente de novo.';
@@ -110,7 +112,7 @@ function renderList() {
       <span class="hd" aria-hidden="true" title="Arraste para reordenar">${canOrder ? '⋮⋮' : ''}</span>
       ${f ? `<img class="th" src="${esc(G.src(f.th || f.md))}" alt="" loading="lazy">` : '<span class="th"></span>'}
       <div class="nm"><b>${esc(i.nome)}${i.complemento ? ' · ' + esc(i.complemento) : ''}</b><small>${esc(i.codigo)} · ${esc(fmt.loc(i))} · ${esc(fmt.price(i))}${fmt.status(i) ? ' · ' + fmt.status(i) : ''}</small></div>
-      <div class="flags"><button type="button" class="pill" data-act="pub" aria-pressed="${!!i.publicado}">${i.publicado ? 'Publicado' : 'Não publicado'}</button><button type="button" class="pill gold" data-act="dest" aria-pressed="${!!i.destaque}">★ Destaque</button></div>
+      <div class="flags"><button type="button" class="pill" data-act="pub" aria-pressed="${!!i.publicado}">${i.publicado ? 'Publicado' : 'Não publicado'}</button><button type="button" class="pill gold" data-act="dest" aria-pressed="${!!i.destaque}">★ Destaque</button><button type="button" class="pill opo-p" data-act="opo" aria-pressed="${!!i.oportunidade}">Oportunidade</button></div>
       <div class="acts">
        <button type="button" class="ib" data-act="up" aria-label="Subir ${esc(i.nome)}" ${prevSame ? '' : 'disabled'}>↑</button>
        <button type="button" class="ib" data-act="down" aria-label="Descer ${esc(i.nome)}" ${nextSame ? '' : 'disabled'}>↓</button>
@@ -127,15 +129,15 @@ $('#list').addEventListener('click', async e => {
   const act = b.dataset.act;
   if (act === 'edit') return openEditor(im);
   if (act === 'del') return removeImovel(im);
-  if (act === 'pub' || act === 'dest') {
-    const field = act === 'pub' ? 'publicado' : 'destaque', val = !im[field];
+  if (act === 'pub' || act === 'dest' || act === 'opo') {
+    const field = { pub: 'publicado', dest: 'destaque', opo: 'oportunidade' }[act], val = !im[field];
     if (field === 'publicado' && val && !(im.fotos || []).length) { toast('Para publicar, envie ao menos uma foto do imóvel.', true); return; }
     b.disabled = true;
     const { error } = await sb.from('imoveis').update({ [field]: val }).eq('id', id);
     b.disabled = false;
     if (error) return toast(errMsg(error), true);
     im[field] = val; all.sort(byOrder); renderList();
-    toast(field === 'publicado' ? (val ? 'Imóvel publicado no site.' : 'Imóvel retirado do site.') : (val ? 'Imóvel em destaque.' : 'Destaque removido.'));
+    toast({ publicado: val ? 'Imóvel publicado no site.' : 'Imóvel retirado do site.', destaque: val ? 'Imóvel em destaque.' : 'Destaque removido.', oportunidade: val ? 'Selo "Oportunidade" ativado.' : 'Selo "Oportunidade" removido.' }[field]);
   }
   if (act === 'up' || act === 'down') move(id, act === 'up' ? -1 : 1);
 });
@@ -176,15 +178,15 @@ async function removeImovel(im) {
 
 /* ---------- editor ---------- */
 const F = name => $('#f-edit').elements[name];
-const NUM = ['valor', 'area_privativa', 'area_total'], INT = ['dormitorios', 'suites', 'banheiros', 'vagas'];
+const NUM = ['valor', 'valor_anterior', 'area_privativa', 'area_total'], INT = ['dormitorios', 'suites', 'banheiros', 'vagas'];
 const TXT = ['nome', 'codigo', 'tipo', 'complemento', 'endereco', 'bairro', 'cidade', 'estado', 'descricao', 'info_complementar', 'finalidade', 'status', 'slug'];
 function showList() { $('#s-edit').hidden = true; $('#s-list').hidden = false; scrollTo(0, 0); }
 function openEditor(im) {
   const isNew = !im;
-  im = im || { id: uid(), nome: '', tipo: 'Apartamento', finalidade: 'venda', status: 'disponivel', cidade: 'Balneário Camboriú', estado: 'SC', fotos: [], caracteristicas: [], publicado: false, destaque: false };
+  im = im || { id: uid(), nome: '', tipo: 'Apartamento', finalidade: 'venda', status: 'disponivel', cidade: 'Balneário Camboriú', estado: 'SC', fotos: [], caracteristicas: [], publicado: false, destaque: false, oportunidade: false };
   ed = { id: im.id, isNew, fotos: (im.fotos || []).map(f => ({ ...f })), removed: [], uploaded: [], busy: 0, dirty: false, slugTouched: !isNew, orig: im };
   TXT.forEach(k => F(k).value = im[k] == null ? '' : im[k]);
-  F('valor').value = money(im.valor); F('area_privativa').value = dec(im.area_privativa); F('area_total').value = dec(im.area_total);
+  F('valor').value = money(im.valor); F('valor_anterior').value = money(im.valor_anterior); F('oportunidade').checked = !!im.oportunidade; F('area_privativa').value = dec(im.area_privativa); F('area_total').value = dec(im.area_total);
   INT.forEach(k => F(k).value = im[k] == null ? '' : im[k]);
   F('caracteristicas').value = (im.caracteristicas || []).join('\n');
   F('publicado').checked = !!im.publicado; F('destaque').checked = !!im.destaque;
@@ -203,7 +205,7 @@ function collect() {
   INT.forEach(k => { const v = F(k).value.trim(); o[k] = v === '' ? null : Number(v); });
   o.caracteristicas = F('caracteristicas').value.split('\n').map(s => s.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
   o.descricao = o.descricao || ''; o.info_complementar = o.info_complementar || '';
-  o.publicado = F('publicado').checked; o.destaque = F('destaque').checked;
+  o.publicado = F('publicado').checked; o.destaque = F('destaque').checked; o.oportunidade = F('oportunidade').checked;
   o.fotos = ed.fotos.filter(f => !f.tmp).map(({ lg, md, th, w, h, alt, files }) => ({ lg, md, th, w, h, alt: alt || '', files: files || [] }));
   return o;
 }
@@ -217,6 +219,8 @@ function validate(o) {
   if (!/^[A-Z]{2}$/.test(o.estado)) bad('estado', 'Use a sigla do estado, ex.: SC.');
   NUM.forEach(k => { if (Number.isNaN(o[k]) || (o[k] != null && o[k] < 0)) bad(k, 'Número inválido. Ex.: 1.250.000,00'); });
   if (o.area_privativa === 0) bad('area_privativa', 'Deixe em branco ou informe a área.');
+  if (o.valor_anterior === 0) o.valor_anterior = null;
+  if (o.valor_anterior != null && !Number.isNaN(o.valor_anterior) && (o.valor == null || o.valor_anterior <= o.valor)) bad('valor_anterior', o.valor == null ? 'Informe também o valor atual ("por").' : 'Precisa ser maior que o valor atual.');
   if (o.area_total === 0) bad('area_total', 'Deixe em branco ou informe a área.');
   INT.forEach(k => { if (o[k] != null && (!Number.isInteger(o[k]) || o[k] < 0 || o[k] > 50)) bad(k, 'Use um número inteiro entre 0 e 50.'); });
   if (o.suites != null && o.dormitorios != null && o.suites > o.dormitorios) bad('suites', 'Não pode ser maior que o número de dormitórios.');
@@ -230,7 +234,7 @@ function preview() {
   o.slug = o.slug || slugify([o.nome, o.tipo, o.complemento].filter(Boolean).join(' ')) || 'novo-imovel';
   o.nome = o.nome || 'Nome do empreendimento';
   $('#pv').innerHTML = G.card(o);
-  $('#lbl-valor').textContent = F('finalidade').value === 'locacao' ? 'Aluguel mensal (R$)' : 'Valor (R$)';
+  $('#lbl-valor').textContent = (F('finalidade').value === 'locacao' ? 'Aluguel mensal (R$)' : 'Valor (R$)') + (F('valor_anterior').value.trim() ? ', "por"' : '');
 }
 $('#f-edit').addEventListener('input', e => {
   if (!ed) return; ed.dirty = true;
@@ -240,7 +244,7 @@ $('#f-edit').addEventListener('input', e => {
   $('#e-err').textContent = '';
   preview();
 });
-['valor', 'area_privativa', 'area_total'].forEach(k => F(k).addEventListener('blur', () => { const v = parseNum(F(k).value); if (v != null && !Number.isNaN(v)) F(k).value = k === 'valor' ? money(v) : dec(v); }));
+['valor', 'valor_anterior', 'area_privativa', 'area_total'].forEach(k => F(k).addEventListener('blur', () => { const v = parseNum(F(k).value); if (v != null && !Number.isNaN(v)) F(k).value = k.startsWith('valor') ? money(v) : dec(v); }));
 F('estado').addEventListener('input', () => F('estado').value = F('estado').value.toUpperCase());
 
 $('#f-edit').addEventListener('submit', async e => {

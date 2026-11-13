@@ -24,6 +24,14 @@ const STATUS = { disponivel: '', reservado: 'Reservado', vendido: 'Vendido', alu
 const fmt = {
   price(im) { const v = n(im.valor); return v ? brl(v) + (im.finalidade === 'locacao' ? '/mês' : '') : 'Sob consulta'; },
   priceLabel(im) { return im.finalidade === 'locacao' ? 'Aluguel' : 'Valor'; },
+  /* preço "de": só aparece quando é maior que o preço atual */
+  oldPrice(im) { const a = n(im.valor_anterior), v = n(im.valor); return a && v && a > v ? brl(a) + (im.finalidade === 'locacao' ? '/mês' : '') : ''; },
+  /* bloco de preço padronizado: "Valor R$ X" ou "De R$ X / Por R$ Y" */
+  priceHTML(im) {
+    const old = fmt.oldPrice(im);
+    if (!old) return `<small>${fmt.priceLabel(im)}</small>${esc(fmt.price(im))}`;
+    return `<small class="de">De <s>${esc(old)}</s></small><span class="por"><small>Por</small> ${esc(fmt.price(im))}</span>`;
+  },
   area(v) { return nf.format(v) + ' m²'; },
   loc(im) { return [im.bairro, im.cidade].filter(Boolean).join(' · '); },
   unit(im) { return [[im.tipo, im.complemento].filter(Boolean).join(' '), im.endereco].filter(Boolean).join(' · '); },
@@ -45,15 +53,15 @@ function card(im) {
   const f = (im.fotos || [])[0], url = imovelUrl(im), total = (im.fotos || []).length, st = fmt.status(im);
   const alt = (f && f.alt) || `${fmt.title(im)}: foto principal`;
   const img = f ? `<img src="${esc(src(f.md || f.lg))}" srcset="${esc(src(f.md || f.lg))} 720w, ${esc(src(f.lg || f.md))} 1280w" sizes="(max-width:640px) 88vw, (max-width:1080px) 46vw, 390px" alt="${esc(alt)}" width="${f.w || 1280}" height="${f.h || 853}" loading="lazy" decoding="async" draggable="false">` : '';
-  return `<article class="prop" data-id="${esc(im.id)}">
-    <a class="ph" href="${esc(url)}" tabindex="-1" aria-hidden="true" draggable="false">${img}${total > 1 ? `<span class="tag">${total} fotos</span>` : ''}${st ? `<span class="st-badge">${st}</span>` : ''}</a>
+  return `<article class="prop${im.oportunidade ? ' is-opo' : ''}" data-id="${esc(im.id)}">
+    <a class="ph" href="${esc(url)}" tabindex="-1" aria-hidden="true" draggable="false">${img}${total > 1 ? `<span class="tag">${total} fotos</span>` : ''}${st ? `<span class="st-badge">${st}</span>` : ''}${im.oportunidade ? '<span class="opo"><i aria-hidden="true"></i>Oportunidade</span>' : ''}</a>
     <div class="bd">
-     <span class="loc">${esc(fmt.loc(im))}</span>
+     <span class="loc">${im.oportunidade ? '<span class="sr">Oportunidade. </span>' : ''}${esc(fmt.loc(im))}</span>
      <h3>${esc(im.nome)}</h3>
      <p class="unit">${esc(fmt.unit(im))}</p>
      <ul class="specs" aria-label="Características">${fmt.specs(im)}</ul>
      <div class="ft">
-      <p class="price"><small>${fmt.priceLabel(im)}</small>${esc(fmt.price(im))}</p>
+      <p class="price${fmt.oldPrice(im) ? ' deal' : ''}">${fmt.priceHTML(im)}</p>
       <a class="btn" href="${esc(url)}" draggable="false" aria-label="Ver imóvel: ${esc(fmt.title(im))}">Ver imóvel</a>
      </div>
     </div>
@@ -61,7 +69,7 @@ function card(im) {
 }
 
 /* dados: Supabase (API REST pública, só leitura de anúncios publicados) ou demonstração local */
-const COLS = 'id,slug,codigo,nome,tipo,complemento,finalidade,endereco,bairro,cidade,estado,valor,area_privativa,area_total,dormitorios,suites,banheiros,vagas,descricao,caracteristicas,info_complementar,status,publicado,destaque,ordem,fotos,updated_at';
+const COLS = '*'; // todas as colunas: novos campos do painel aparecem sem precisar mudar esta lista
 async function rest(q) {
   const r = await fetch(`${CONFIG.supabaseUrl.replace(/\/$/, '')}/rest/v1/imoveis?${q}`, {
     // chave antiga "anon" (JWT, começa com eyJ) vai também como Bearer; a nova "publishable" (sb_publishable_…) só no apikey

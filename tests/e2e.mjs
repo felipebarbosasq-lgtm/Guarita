@@ -45,9 +45,11 @@ const noHScroll = p => p.evaluate(() => document.documentElement.scrollWidth <= 
 console.log('\n1. index.html aberto direto do disco (modo demonstração)');
 {
   const { ctx, p } = await page();
+  // simula um config.js sem banco (modo demonstração), mesmo que o projeto já esteja ligado ao Supabase real
+  await ctx.addInitScript(() => { let c; Object.defineProperty(window, 'GUARITA_CONFIG', { configurable: true, get: () => c, set: v => { c = { ...v, supabaseUrl: '', supabaseAnonKey: '' }; } }); });
   await p.goto('file://' + path.join(ROOT, 'public/index.html'));
   await p.waitForSelector('#car .prop:not(.skel)');
-  ok(await p.locator('.hero .slide').count() === 4, 'abertura com exatamente 4 fotos');
+  ok(await p.locator('.hero .slide').count() === 3, 'abertura com as 3 fotos enviadas');
   await p.evaluate(() => document.fonts.ready);
   ok(await p.evaluate(() => ['Cormorant Garamond', 'Jost'].every(n => [...document.fonts].some(f => f.family.replace(/"/g, '') === n && f.status === 'loaded'))), 'fontes originais carregadas mesmo abrindo do disco');
   ok(await p.locator('.hero h1').innerText() === 'Guarita\nImobiliária' || (await p.locator('.hero h1').innerText()).replace(/\s+/g, ' ') === 'Guarita Imobiliária', 'título "Guarita Imobiliária" mantido');
@@ -63,7 +65,7 @@ console.log('\n1. index.html aberto direto do disco (modo demonstração)');
   const tw = await p.locator('[role=tab]').evaluateAll(t => t.map(x => Math.round(x.getBoundingClientRect().width)));
   ok(Math.max(...tw) - Math.min(...tw) <= 1, 'abas com larguras iguais ' + tw.join('/'));
   ok(await p.locator('#p-comprar input[value="Tanto faz"]').count() === 0 && await p.locator('#p-comprar input[name="Imóvel"]').count() === 2, 'botão "Tanto faz" removido; restam Na planta | Pronto');
-  ok(await p.locator('text=Jeferson').count() === 0 && await p.locator('text=Jefferson Monteiro').count() >= 1, 'nome Jefferson correto');
+  ok(await p.locator('text=Jefferson').count() === 0 && await p.locator('text=Jeferson Monteiro').count() >= 1 && !(await p.content()).includes('Jefferson'), 'nome Jeferson (um F) em todo o site, inclusive textos ocultos');
   // formulário Comprar
   await p.locator('#atendimento').scrollIntoViewIfNeeded();
   await p.click('#p-comprar button[type=submit]');
@@ -76,7 +78,7 @@ console.log('\n1. index.html aberto direto do disco (modo demonstração)');
   ok(opened.startsWith('https://wa.me/554791127088?') && txt.includes('Interesse: Compra') && txt.includes('Imóvel: Pronto') && txt.includes('WhatsApp: (47) 99999-8888'), 'Comprar envia pelo WhatsApp da Guarita');
   for (const [tab, tipo, fill] of [['#tab-alugar', 'Locação', async () => { await p.fill('#a-nome', 'João'); await p.fill('#a-wa', '4733334444'); await p.selectOption('#a-reg', 'Porto Belo'); await p.selectOption('#a-tipo', 'Casa'); await p.check('#p-alugar [name=consent]'); }],
     ['#tab-anunciar', 'Administração de imóvel para locação', async () => { await p.fill('#n-nome', 'Ana'); await p.fill('#n-wa', '47988887777'); await p.selectOption('#n-cid', 'Itapema'); await p.selectOption('#n-tipo', 'Apartamento'); await p.check('#p-anunciar [name=consent]'); }]]) {
-    await p.locator(tab).evaluate(e => e.scrollIntoView({ block: 'center' })); await p.click(tab); const pid = tab.replace('#tab-', '#p-');
+    await p.locator(tab).evaluate(e => e.scrollIntoView({ block: 'center', behavior: 'instant' })); await p.waitForTimeout(150); await p.click(tab); await p.waitForSelector(tab.replace('#tab-', '#p-') + ':not([hidden])'); const pid = tab.replace('#tab-', '#p-');
     await p.click(`${pid} button[type=submit]`);
     ok(await p.locator(`${pid} .err:not(:empty)`).count() >= 4, `${tipo}: valida antes de enviar`);
     await fill(); await p.click(`${pid} button[type=submit]`);
@@ -88,7 +90,7 @@ console.log('\n1. index.html aberto direto do disco (modo demonstração)');
   await p.locator('#car .prop a.btn').click();
   await p.waitForSelector('#im:not([hidden])');
   ok(p.url().includes('imovel/index.html?i=eleganza-tower-apartamento-4200'), '“Ver imóvel” abre a página do imóvel (local)');
-  ok((await p.locator('#im-nome').innerText()) === 'Eleganza Tower' && (await p.locator('#im-preco').innerText()) === 'R$ 7.519.000,00', 'página do imóvel com nome e preço');
+  ok((await p.locator('#im-nome').innerText()) === 'Eleganza Tower' && (await p.locator('#im-preco').innerText()).endsWith('R$ 7.519.000,00') && await p.locator('#im-opo:not([hidden])').count() === 0, 'página do imóvel com nome e preço');
   const wa = decodeURIComponent((await p.locator('#im-wa').getAttribute('href')).split('text=')[1]);
   ok(wa === 'Olá, Guarita Imobiliária! Gostaria de receber mais informações sobre o imóvel Eleganza Tower, apartamento 4200, referência GUA-0001.', 'WhatsApp do imóvel com nome e código: ' + wa);
   await p.click('#gal .g0'); await p.waitForSelector('#lb.on');
@@ -153,13 +155,15 @@ let novoSlug = '';
   await p.click('#b-new');
   await p.fill('#e-nome', 'Residencial Teste Mar'); await p.fill('#e-tipo', 'Cobertura'); await p.fill('#e-complemento', '1801');
   await p.fill('#e-endereco', 'Avenida Atlântica, 1000'); await p.fill('#e-bairro', 'Barra Sul'); await p.fill('#e-cidade', 'Balneário Camboriú');
-  await p.fill('#e-valor', '12.500.000,00'); await p.fill('#e-area_privativa', '320,5'); await p.fill('#e-area_total', '480');
+  await p.fill('#e-valor', '12.500.000,00'); await p.fill('#e-valor_anterior', '11.000.000'); await p.fill('#e-area_privativa', '320,5'); await p.fill('#e-area_total', '480');
   await p.fill('#e-dormitorios', '5'); await p.fill('#e-suites', '6'); await p.fill('#e-banheiros', '7'); await p.fill('#e-vagas', '4');
   await p.fill('#e-descricao', 'Cobertura de teste.\n\nSegundo parágrafo.'); await p.fill('#e-caracteristicas', 'Vista para o mar\nPiscina privativa');
   await p.check('#e-publicado', { force: true });
   await p.click('#b-save');
   ok((await p.locator('#e-suites ~ .err').innerText()).includes('maior'), 'validação: suítes > dormitórios');
+  ok((await p.locator('#e-valor_anterior ~ .err').innerText()).includes('maior que o valor atual'), 'validação: preço "de" precisa ser maior que o "por"');
   ok((await p.locator('#e-err').innerText()).length > 0, 'validação: não publica sem foto');
+  await p.fill('#e-valor_anterior', '14.000.000'); await p.check('#e-oportunidade', { force: true });
   await p.fill('#e-suites', '3');
   await p.setInputFiles('#e-files', [`${FIX}/foto1.jpg`, `${FIX}/foto2.jpg`, `${FIX}/foto3.jpg`, `${FIX}/foto4.jpg`, `${FIX}/pequena.jpg`, `${FIX}/texto.jpg`]);
   await p.waitForFunction(() => document.querySelectorAll('#photos .ph-i').length === 4 && !document.querySelector('#photos .prog'), null, { timeout: 60000 });
@@ -171,6 +175,7 @@ let novoSlug = '';
   ok(await p.locator('#photos .ph-i').first().locator('.cap').count() === 1, 'foto escolhida virou capa');
   await p.locator('#pv .prop').waitFor();
   ok((await p.locator('#pv .prop').innerText()).includes('R$ 12.500.000,00'), 'pré-visualização do cartão com valor formatado');
+  ok(await p.locator('#pv .prop .opo').count() === 1 && (await p.locator('#pv .price s').innerText()) === 'R$ 14.000.000,00', 'pré-visualização mostra selo Oportunidade e preço "de" riscado');
   await p.click('#b-save');
   await p.waitForSelector('#toast.on');
   const t = await p.locator('#toast').innerText();
@@ -183,6 +188,26 @@ let novoSlug = '';
   ok(dims[0] <= 960 && Math.abs(dims[0] / dims[1] - 1600 / 2400) < .01, 'proporção original preservada (sem distorção): ' + dims);
   await p.screenshot({ path: path.join(SHOTS, 'admin-editor.png'), fullPage: true });
 
+  // site público: selo e preço de/por no cartão e na página do imóvel
+  {
+    const pub = await ctx.newPage();
+    await pub.goto(SITE + '/'); await pub.waitForSelector('#car .prop:not(.skel)');
+    const card = pub.locator('#car .prop:not([aria-hidden])', { hasText: 'Residencial Teste Mar' });
+    const opo = card.locator('.opo');
+    ok(await opo.count() === 1 && (await opo.innerText()).toUpperCase().includes('OPORTUNIDADE'), 'site: cartão com a faixa "Oportunidade"');
+    const st = await opo.evaluate(e => { const c = getComputedStyle(e); return [c.color, c.animationName, getComputedStyle(e.querySelector('i'), '::after').animationName]; });
+    ok(st[0] === 'rgb(13, 12, 10)' && st[1] === 'opo' && st[2] === 'opo-ping', 'site: texto preto e pulso discreto ' + st.join(' / '));
+    const price = (await card.locator('.price').innerText()).replace(/\s+/g, ' ');
+    ok(/De R\$ 14\.000\.000,00 Por R\$ 12\.500\.000,00/i.test(price) && await card.locator('.price s').count() === 1, 'site: "De R$ 14.000.000,00" riscado e "Por R$ 12.500.000,00": ' + price);
+    await pub.goto(SITE + '/imovel/residencial-teste-mar-cobertura-1801'); await pub.waitForSelector('#im:not([hidden])');
+    ok(await pub.locator('#im-opo:not([hidden])').count() === 1 && await pub.locator('#gal .g0 .opo').count() === 1 && (await pub.locator('#im-preco s').innerText()) === 'R$ 14.000.000,00', 'página do imóvel: selo e preço de/por');
+    await pub.screenshot({ path: path.join(SHOTS, 'oportunidade-imovel.png') });
+    await pub.goto(SITE + '/'); await pub.waitForSelector('#car .prop:not(.skel)');
+    await pub.evaluate(() => document.querySelectorAll('.rv').forEach(e => e.classList.add('in'))); await pub.locator('#imoveis').scrollIntoViewIfNeeded();
+    await pub.mouse.move(700, 600); await sleep(1500);
+    await pub.screenshot({ path: path.join(SHOTS, 'oportunidade-cartao.png') });
+    await pub.close();
+  }
   // mais imóveis para testar o carrossel
   for (const [nome, cidade, valor] of [['Teste Dois', 'Itapema', '3.200.000'], ['Teste Três', 'Porto Belo', '2.100.000'], ['Teste Quatro', 'Itajaí', '1.800.000']]) {
     await p.click('#b-back'); await p.click('#b-new');
@@ -273,6 +298,8 @@ for (const [label, opts, per] of [['computador', { viewport: { width: 1440, heig
   ok(Math.abs(a - b) < 1, 'movimento reduzido: carrossel não anda sozinho');
   const anim = await p.evaluate(() => getComputedStyle(document.querySelector('.slide.on img')).animationName);
   ok(anim === 'none', 'movimento reduzido: sem zoom no banner');
+  const opoAnim = await p.evaluate(() => { const e = document.querySelector('#car .opo'); return e ? getComputedStyle(e).animationName : 'none'; });
+  ok(opoAnim === 'none', 'movimento reduzido: selo Oportunidade sem pulsar');
   await ctx.close();
 }
 

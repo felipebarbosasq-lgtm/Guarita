@@ -2,7 +2,7 @@
 """Gera as fotos da abertura (banner) a partir dos originais e atualiza index.html.
 
 Uso:  python3 tools/hero_images.py PASTA_DOS_ORIGINAIS
-      (arquivos 1.jpg, 2.jpg, 3.jpg, 4.jpg na ordem de HERO abaixo; requer Pillow)
+      (arquivos 1.jpg, 2.jpg, 3.jpg… na ordem de HERO abaixo, já ampliados; requer Pillow)
 
 Para cada foto cria:
   - versões para computador (corte horizontal) em 1280, 1920, 2560 e 3840 px, até o tamanho do original
@@ -19,26 +19,16 @@ HTML = [os.path.join(ROOT, 'public/index.html'), os.path.join(ROOT, 'public/imov
 # Ordem de exibição. "desk": proporção máxima do corte horizontal e foco vertical (0-1).
 # "mob": foco horizontal (0-1) do corte vertical para celular. "pos": object-position no computador.
 HERO = [
-    dict(slug='praia-central-aerea', title='Vista aérea da Praia Central',
-         alt='Vista aérea da Praia Central de Balneário Camboriú, com a curva da orla, o mar e os arranha-céus',
-         desk=(16 / 9, .52), mob=.36, pos='50% 50%', mpos='50% 50%',
-         author='Trustable', file='Balneário_Camboriú_from_Unipraias_Park_2023-04-02.jpg', lic='CC BY-SA 4.0',
-         licurl='https://creativecommons.org/licenses/by-sa/4.0/deed.pt-br'),
-    dict(slug='skyline-mar', title='Skyline visto do mar',
-         alt='Skyline de edifícios de alto padrão de Balneário Camboriú visto do mar, com a serra ao fundo',
-         desk=(None, .5), mob=.44, pos='50% 62%', mpos='50% 60%',
-         author='Hayden Soloviev', file='Balneario_Camboriu_Skyline_from_the_Sea_2019.jpg', lic='CC BY 4.0',
-         licurl='https://creativecommons.org/licenses/by/4.0/deed.pt-br'),
-    dict(slug='por-do-sol', title='Pôr do sol na orla',
-         alt='Pôr do sol dourado sobre o mar e a silhueta dos edifícios da orla de Balneário Camboriú',
-         desk=(None, .5), mob=.42, pos='50% 60%', mpos='50% 55%',
-         author='caetano051068', file='Balneário_Camboriú_-_SC_-_Brasil_-_panoramio.jpg', lic='CC BY-SA 3.0',
-         licurl='https://creativecommons.org/licenses/by-sa/3.0/deed.pt-br'),
-    dict(slug='orla-noite', title='Orla iluminada à noite',
-         alt='Orla de Balneário Camboriú iluminada ao anoitecer, com os edifícios refletidos no mar',
-         desk=(None, .5), mob=.62, pos='50% 55%', mpos='50% 55%',
-         author='Angeloleithold', file='1_Camboriu_angeloleithold_py5aal.JPG', lic='CC BY 3.0',
-         licurl='https://creativecommons.org/licenses/by/3.0/deed.pt-br'),
+    # Fotos enviadas pela Guarita Imobiliária, ampliadas 4x com IA (Real-ESRGAN) por tools/ampliar_fotos.py.
+    dict(slug='bc-barra-sul', title='Barra Sul e marina',
+         alt='Vista aérea da Barra Sul de Balneário Camboriú, com a marina, o molhe e os arranha-céus à beira-mar',
+         desk=(16 / 9, .5), mob=.63, pos='50% 50%', mpos='50% 50%'),
+    dict(slug='bc-praia-central', title='Praia Central e roda-gigante',
+         alt='Vista aérea da Praia Central de Balneário Camboriú, com a roda-gigante, o mar e a orla de edifícios',
+         desk=(16 / 9, .5), mob=.60, pos='50% 50%', mpos='50% 50%'),
+    dict(slug='bc-entardecer', title='Entardecer na Barra Sul',
+         alt='Balneário Camboriú ao entardecer, com os arranha-céus, a roda-gigante e o molhe vistos do alto',
+         desk=(16 / 9, .45), mob=.34, pos='50% 50%', mpos='50% 50%'),
 ]
 DESK_W = [1280, 1920, 2560, 3840]
 MOB_W = [720, 1080]
@@ -106,7 +96,10 @@ def write_html(meta):
   </picture>
  </div>''')
         dots.append(f'<button type="button"{" class=\"on\"" if first else ""} aria-label="Foto {k + 1}: {h["title"]}" aria-pressed="{"true" if first else "false"}"></button>')
-        credits.append(f'     <li>Abertura, {h["title"].lower()}: {h["author"]}, <a href="https://commons.wikimedia.org/wiki/File:{h["file"]}" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="{h["licurl"]}" target="_blank" rel="noopener">{h["lic"]}</a>, recortada e redimensionada.</li>')
+        if h.get('author'):
+            credits.append(f'     <li>Abertura, {h["title"].lower()}: {h["author"]}, <a href="https://commons.wikimedia.org/wiki/File:{h["file"]}" target="_blank" rel="noopener">Wikimedia Commons</a>, <a href="{h["licurl"]}" target="_blank" rel="noopener">{h["lic"]}</a>, recortada e redimensionada.</li>')
+    if not any(h.get('author') for h in meta):
+        credits = ['     <li>Fotos da abertura: acervo da Guarita Imobiliária.</li>']
     h0 = meta[0]
     preload = (f'<link rel="preload" as="image" type="image/webp" href="assets/img/hero/{h0["slug"]}-1920.webp" imagesrcset="{ss(h0["slug"], h0["ds"])}" imagesizes="100vw" media="(min-aspect-ratio: 4/5)" fetchpriority="high">\n'
                f'<link rel="preload" as="image" type="image/webp" href="assets/img/hero/{h0["slug"]}-m-{h0["ms"][-1][0]}.webp" imagesrcset="{ss(h0["slug"], h0["ms"], "-m")}" imagesizes="100vw" media="(max-aspect-ratio: 4/5)" fetchpriority="high">')
