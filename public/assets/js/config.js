@@ -5,8 +5,8 @@
    Sem supabaseUrl/supabaseAnonKey o site funciona em "modo demonstração": mostra os imóveis
    de assets/js/demo-data.js e o painel /admin fica indisponível. */
 window.GUARITA_CONFIG = {
-  supabaseUrl: '',          // [build] SUPABASE_URL      ex.: https://abcdefgh.supabase.co
-  supabaseAnonKey: '',      // [build] SUPABASE_ANON_KEY chave pública "anon" (protegida pelas regras RLS do banco)
+  supabaseUrl: 'https://hszjbgoldgfvzkuyacai.supabase.co',          // [build] SUPABASE_URL      ex.: https://abcdefgh.supabase.co
+  supabaseAnonKey: 'sb_publishable_HhL68TDgEY4D6ZvfG6WaFw_iPmLU82H',      // [build] SUPABASE_ANON_KEY chave pública "anon" (protegida pelas regras RLS do banco)
   storageBucket: 'imoveis', // [build] SUPABASE_BUCKET   bucket público das fotos dos imóveis
   siteUrl: '',              // [build] SITE_URL          ex.: https://www.guaritaimobiliaria.com.br
   prettyUrls: false,        // [build] true no Netlify: /imovel/nome-do-imovel. Localmente usa imovel/index.html?i=nome
