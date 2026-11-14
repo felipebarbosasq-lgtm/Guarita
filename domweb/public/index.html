@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0d0d">
+  <title>Cardápio</title>
+  <meta name="description" content="Faça seu pedido online.">
+  <link rel="icon" href="/img/logo.jpg">
+  <link rel="stylesheet" href="/css/tema.css">
+  <link rel="stylesheet" href="/css/loja.css">
+</head>
+<body>
+  <header class="capa" id="capa">
+    <div class="capa-img" id="capaImg"></div>
+    <div class="capa-conteudo">
+      <img class="logo" id="logo" alt="">
+      <div class="capa-texto">
+        <h1 id="nomeLoja">Carregando…</h1>
+        <div class="capa-info">
+          <span class="pill" id="status"></span>
+          <button class="link-info" id="btnInfo" type="button">Horários e informações</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="pagina">
+    <section class="resumo-loja" id="resumoLoja"></section>
+
+    <div class="modo" id="modo" role="tablist" aria-label="Como você quer receber">
+      <button type="button" data-tipo="entrega" role="tab">🛵 Entrega</button>
+      <button type="button" data-tipo="retirada" role="tab">🏪 Retirada</button>
+    </div>
+
+    <div class="busca">
+      <input class="input" id="busca" type="search" placeholder="Buscar no cardápio" aria-label="Buscar no cardápio">
+    </div>
+
+    <nav class="cats" id="cats" aria-label="Categorias"></nav>
+    <div id="lista"></div>
+  </main>
+
+  <footer class="rodape">
+    Pedidos online por <span class="marca">DOM<b>Web</b></span>
+  </footer>
+
+  <button class="barra-carrinho oculto" id="barraCarrinho" type="button">
+    <span class="qtd" id="barraQtd">0</span>
+    <span>Ver carrinho</span>
+    <strong id="barraTotal">R$ 0,00</strong>
+  </button>
+
+  <div class="fundo" id="fundo"></div>
+  <section class="folha" id="folha" role="dialog" aria-modal="true" aria-labelledby="folhaTitulo"></section>
+
+  <script src="/js/config.js"></script>
+  <script type="module" src="/js/loja.js"></script>
+</body>
+</html>
