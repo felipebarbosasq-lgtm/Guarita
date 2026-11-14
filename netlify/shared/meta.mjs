@@ -35,8 +35,11 @@ export function sitemap(origin, imoveis) {
     `\n</urlset>\n`;
 }
 
+/* lê a vitrine pública imoveis_site (unidade já oculta); sem ela, a tabela antiga com a unidade escondida aqui */
 export async function fetchImoveis(supabaseUrl, key, query) {
-  const r = await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/imoveis?${query}`, { headers: { apikey: key, ...(/^eyJ/.test(key) ? { Authorization: `Bearer ${key}` } : {}) } });
+  const get = t => fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/${t}?${query}`, { headers: { apikey: key, ...(/^eyJ/.test(key) ? { Authorization: `Bearer ${key}` } : {}) } });
+  let r = await get('imoveis_site');
+  if (r.status === 404) r = await get('imoveis');
   if (!r.ok) throw new Error('Supabase ' + r.status);
-  return r.json();
+  return (await r.json()).map(im => (im.ocultar_unidade ? { ...im, complemento: null } : im));
 }

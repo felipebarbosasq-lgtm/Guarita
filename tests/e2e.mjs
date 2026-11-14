@@ -183,7 +183,8 @@ let novoSlug = '';
   const t = await p.locator('#toast').innerText();
   ok(/Imóvel cadastrado \(GUA-\d{4}\)/.test(t), 'imóvel salvo com código automático: ' + t);
   novoSlug = await p.inputValue('#e-slug');
-  ok(novoSlug === 'residencial-teste-mar-cobertura-1801', 'endereço da página gerado: ' + novoSlug);
+  ok(novoSlug.startsWith('residencial-teste-mar-cobertura-') && !novoSlug.includes('1801'), 'apartamento oculto por padrão: o link da página não revela o número (' + novoSlug + ')');
+  ok((await p.locator('#lbl-unid').innerText()).includes('oculto') && !(await p.locator('#pv .prop').innerText()).includes('1801'), 'botão mostra "oculto" e a prévia não exibe o número');
   const saved = await p.evaluate(async () => (await (await fetch(document.querySelector('#pv img').src)).blob()).type);
   ok(saved === 'image/webp', 'fotos otimizadas em WebP');
   const dims = await p.evaluate(() => { const i = document.querySelector('#pv img'); return [i.naturalWidth, i.naturalHeight]; });
@@ -201,7 +202,18 @@ let novoSlug = '';
     ok(st[0] === 'rgb(13, 12, 10)' && st[1] === 'opo' && st[2] === 'opo-ping', 'site: texto preto e pulso discreto ' + st.join(' / '));
     const price = (await card.locator('.price').innerText()).replace(/\s+/g, ' ');
     ok(/De R\$ 14\.000\.000,00 Por R\$ 12\.500\.000,00/i.test(price) && await card.locator('.price s').count() === 1, 'site: "De R$ 14.000.000,00" riscado e "Por R$ 12.500.000,00": ' + price);
-    await pub.goto(SITE + '/imovel/residencial-teste-mar-cobertura-1801'); await pub.waitForSelector('#im:not([hidden])');
+    ok(!(await card.innerText()).includes('1801'), 'site: cartão sem o número do apartamento oculto');
+    const api = await pub.evaluate(async () => { const c = window.GUARITA_CONFIG, h = { apikey: c.supabaseAnonKey, Authorization: 'Bearer ' + c.supabaseAnonKey };
+      const t = await fetch(c.supabaseUrl + '/rest/v1/imoveis?select=complemento', { headers: h }); const v = await (await fetch(c.supabaseUrl + '/rest/v1/imoveis_site?select=nome,complemento,endereco', { headers: h })).json();
+      return [t.status, v.find(x => x.nome === 'Residencial Teste Mar')]; });
+    ok(api[0] === 401 && api[1].complemento === null && api[1].endereco === 'Avenida Atlântica, 1000', 'banco: visitante não lê a tabela completa; a vitrine entrega o apartamento vazio e a rua com número (' + api[0] + ')');
+    await pub.goto(SITE + '/imovel/' + novoSlug); await pub.waitForSelector('#im:not([hidden])');
+    const visivel = await pub.evaluate(() => document.body.innerText + ' ' + document.title + ' ' + [...document.querySelectorAll('meta,script[type="application/ld+json"]')].map(m => m.content || m.textContent).join(' '));
+    ok(!visivel.includes('1801') && visivel.includes('Avenida Atlântica, 1000'), 'página do imóvel: número do apartamento ausente do texto, título, prévia e dados para o Google; rua e número do prédio aparecem');
+    const html = await (await pub.request.get(SITE + '/imovel/' + novoSlug)).text();
+    ok(!html.includes('1801'), 'página entregue pelo servidor (prévia do WhatsApp/Google) sem o número do apartamento');
+    const waTxt = decodeURIComponent((await pub.locator('#im-wa').getAttribute('href')).split('text=')[1]);
+    ok(!waTxt.includes('1801') && /referência GUA-\d{4}/.test(waTxt), 'WhatsApp do imóvel usa o código de referência no lugar do apartamento: ' + waTxt);
     ok(await pub.locator('#im-opo:not([hidden])').count() === 1 && await pub.locator('#gal .g0 .opo').count() === 1 && (await pub.locator('#im-preco s').innerText()) === 'R$ 14.000.000,00', 'página do imóvel: selo e preço de/por');
     await pub.screenshot({ path: path.join(SHOTS, 'oportunidade-imovel.png') });
     await pub.goto(SITE + '/'); await pub.waitForSelector('#car .prop:not(.skel)');
@@ -210,6 +222,18 @@ let novoSlug = '';
     await pub.screenshot({ path: path.join(SHOTS, 'oportunidade-cartao.png') });
     await pub.close();
   }
+  // ligar o botão: o número do apartamento passa a aparecer no site
+  await p.locator('#e-mostrar_unidade').check({ force: true });
+  ok((await p.locator('#lbl-unid').innerText()).includes('visível') && (await p.locator('#pv .prop').innerText()).includes('1801'), 'botão ligado: prévia mostra o número do apartamento');
+  await p.click('#b-save'); await p.waitForSelector('#toast.on');
+  {
+    const pub = await ctx.newPage(); await pub.goto(SITE + '/'); await pub.waitForSelector('#car .prop:not(.skel)');
+    ok((await pub.locator('#car .prop:not([aria-hidden])', { hasText: 'Residencial Teste Mar' }).innerText()).includes('Cobertura 1801'), 'site: com o botão ligado, o cliente vê "Cobertura 1801"');
+    await pub.close();
+  }
+  await p.locator('#e-mostrar_unidade').uncheck({ force: true }); await p.click('#b-save'); await p.waitForSelector('#toast.on');
+  novoSlug = await p.inputValue('#e-slug');
+  ok(!novoSlug.includes('1801'), 'desligado de novo: volta a ficar oculto (' + novoSlug + ')');
   // mais imóveis para testar o carrossel
   for (const [nome, cidade, valor] of [['Teste Dois', 'Itapema', '3.200.000'], ['Teste Três', 'Porto Belo', '2.100.000'], ['Teste Quatro', 'Itajaí', '1.800.000']]) {
     await p.click('#b-back'); await p.click('#b-new');
@@ -262,7 +286,8 @@ console.log('\n3b. Importar do DWV');
   ok(await v('valor') === '3.150.000,00' && await v('area_privativa') === '216,69' && await v('dormitorios') === '3' && await v('suites') === '3' && await v('banheiros') === '4' && await v('vagas') === '3', 'valor, área, dormitórios, suítes, banheiros e vagas preenchidos');
   const car = await v('caracteristicas');
   ok(car.includes('Churrasqueira') && car.includes('Piscina com 3 raias') && car.includes('Mobiliado e equipado'), 'características da unidade e do empreendimento');
-  ok((await v('descricao')).startsWith('Apartamento 102 no Torre de Lyon, no bairro Centro') && (await v('info_complementar')).includes('Condomínio: R$ 2.072,59'), 'descrição e condomínio montados');
+  ok((await v('descricao')).startsWith('Apartamento no Torre de Lyon, no bairro Centro') && !(await v('descricao')).includes('102') && (await v('info_complementar')).includes('Condomínio: R$ 2.072,59'), 'descrição (sem o nº do apartamento) e condomínio montados');
+  ok(!(await p.locator('#e-mostrar_unidade').isChecked()) && !(await v('slug')).includes('102'), 'importado do DWV já vem com o apartamento oculto (link: ' + await v('slug') + ')');
   const nf = await p.locator('#photos .ph-i').count();
   ok(nf === 49, 'todas as fotos do DWV importadas e otimizadas: ' + nf);
   ok((await p.content()).includes('Fernanda') === false || !(await v('descricao')).includes('Fernanda'), 'dados da corretora não entram no cadastro');

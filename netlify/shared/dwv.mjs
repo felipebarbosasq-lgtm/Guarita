@@ -71,7 +71,7 @@ export function normalize(next, text = '') {
   const ond = im.bairro ? `no bairro ${im.bairro}, em ${im.cidade}` : (im.cidade ? `em ${im.cidade}` : '');
   const juntar = l => l.length > 1 ? l.slice(0, -1).join(', ') + ' e ' + l[l.length - 1] : l.join('');
   im.descricao = [
-    `${tipo}${im.complemento ? ' ' + im.complemento : ''} no ${im.nome}${ond ? ', ' + ond : ''}${partes.length ? ', com ' + juntar(partes) : ''}.`,
+    `${tipo} no ${im.nome}${ond ? ', ' + ond : ''}${partes.length ? ', com ' + juntar(partes) : ''}.`,
     unit.length ? `Na unidade: ${juntar(uniq(unit).map(s => s.toLowerCase()))}.` : '',
     dev.length ? `No empreendimento: ${juntar(uniq(dev).map(s => s.toLowerCase()))}.` : '',
   ].filter(Boolean).join('\n\n');

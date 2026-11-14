@@ -17,7 +17,7 @@ exception when insufficient_privilege or check_violation then return 'OK bloquea
 
 -- visitante anônimo
 begin; set local role anon; select set_config('request.jwt.claims','{"role":"anon"}',true);
-select case when count(*)=1 then 'OK visitante vê só publicados ('||count(*)||')' else 'FALHOU' end from imoveis;
+select case when count(*)=1 then 'OK visitante vê só publicados ('||count(*)||')' else 'FALHOU' end from imoveis_site;
 select pg_temp.expect_fail($$insert into imoveis (slug,nome,cidade) values ('x-anon','X','Y')$$,'visitante cadastrar');
 select pg_temp.expect_fail($$update imoveis set valor=1$$,'visitante alterar');
 select pg_temp.expect_fail($$delete from imoveis$$,'visitante excluir');
@@ -26,7 +26,8 @@ rollback;
 
 -- usuário logado que NÃO é administrador
 begin; set local role authenticated; select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}',true);
-select case when count(*)=1 then 'OK não-admin vê só publicados' else 'FALHOU' end from imoveis;
+select case when count(*)=1 then 'OK não-admin vê só publicados (vitrine)' else 'FALHOU' end from imoveis_site;
+select case when count(*)=0 then 'OK não-admin não lê a tabela completa' else 'FALHOU' end from imoveis;
 select pg_temp.expect_fail($$insert into imoveis (slug,nome,cidade) values ('x-intruso','X','Y')$$,'não-admin cadastrar');
 select pg_temp.expect_fail($$update imoveis set valor=1$$,'não-admin alterar');
 select pg_temp.expect_fail($$delete from imoveis$$,'não-admin excluir');

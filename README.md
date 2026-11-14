@@ -132,6 +132,7 @@ Rode cada um **uma vez**, em ordem, no **SQL Editor** do Supabase (*New query > 
 - `atualizacao-02-oportunidade.sql`: selo Oportunidade e preço "de/por".
 - `atualizacao-03-crm-equipe-clientes.sql`: CRM, equipe e clientes.
 - `atualizacao-04-crm-historico-rodizio.sql`: histórico, rodízio/manual e contatos do site no CRM.
+- `atualizacao-05-ocultar-unidade.sql`: botão para ocultar o número do apartamento no site.
 Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizações) e do `seed.sql`.
 
 ### 3.7 Publicar atualizações futuras
@@ -160,6 +161,12 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
   (função `netlify/functions/dwv.mjs`, só para administradores logados), não a API oficial do DWV: se o DWV mudar a
   página, a importação avisa e o cadastro manual continua funcionando. Preços alterados depois no DWV não se atualizam sozinhos.
   Confirme com a construtora/corretora se o imóvel pode ser divulgado no seu site.
+- **Nº do apartamento oculto:** no cadastro, o botão abaixo do campo *Nº do apartamento / unidade* define se o cliente
+  vê o número do apartamento (ex.: 104). Desligado (padrão dos imóveis novos), o número some do cartão, da página, do
+  título, do link da página, da prévia no WhatsApp/Google e da mensagem de WhatsApp (que passa a citar o código de
+  referência); a rua e o número do prédio continuam aparecendo. A proteção é feita no banco: o site lê a vitrine
+  `imoveis_site`, que entrega o apartamento vazio, e visitantes não leem a tabela completa. No painel, o número sempre
+  aparece (com 🔒 quando oculto). Imóveis cadastrados antes da atualização 5 continuam com o número visível até você desligar.
 - **Oportunidade:** ligue "Oportunidade" no imóvel (ou o botão *Oportunidade* na lista) para mostrar no site uma
   faixa dourada com a palavra **OPORTUNIDADE** em preto, com um pulso discreto. Para mostrar desconto, preencha
   **Valor anterior "de"**: o site exibe ~~De R$ 470.000,00~~ **Por R$ 350.000,00** (o "de" precisa ser maior que o valor atual).

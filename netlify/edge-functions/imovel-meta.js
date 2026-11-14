@@ -10,7 +10,7 @@ export default async (request, context) => {
   const slug = decodeURIComponent(new URL(request.url).pathname.split('/')[2] || '');
   if (!url || !key || !slug || slug === 'index.html' || !(res.headers.get('content-type') || '').includes('text/html')) return res;
   try {
-    const [im] = await fetchImoveis(url, key, `select=slug,nome,complemento,tipo,bairro,cidade,valor,finalidade,dormitorios,suites,vagas,area_privativa,fotos&publicado=eq.true&slug=eq.${encodeURIComponent(slug)}&limit=1`);
+    const [im] = await fetchImoveis(url, key, `select=slug,nome,complemento,ocultar_unidade,tipo,bairro,cidade,valor,finalidade,dormitorios,suites,vagas,area_privativa,fotos&publicado=eq.true&slug=eq.${encodeURIComponent(slug)}&limit=1`);
     if (!im) return new Response(await res.text(), { status: 404, headers: res.headers });
     const origin = (Netlify.env.get('SITE_URL') || gen.siteUrl || new URL(request.url).origin).replace(/\/$/, '');
     const headers = new Headers(res.headers); headers.delete('content-length');

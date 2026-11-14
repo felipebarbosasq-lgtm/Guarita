@@ -8,7 +8,7 @@
 -- =====================================================================
 insert into public.imoveis
   (slug, codigo, nome, tipo, complemento, finalidade, endereco, bairro, cidade, estado,
-   valor, area_privativa, dormitorios, suites, vagas, status, publicado, destaque, ordem, fotos)
+   valor, area_privativa, dormitorios, suites, vagas, status, publicado, destaque, ordem, fotos, ocultar_unidade)
 select 'eleganza-tower-apartamento-4200', 'GUA-0001', 'Eleganza Tower', 'Apartamento', '4200', 'venda',
   'Rua 1101, 140', 'Centro', 'Balneário Camboriú', 'SC', 7519000.00, 140, 4, 2, 3, 'disponivel', true, true, 1,
   jsonb_agg(jsonb_build_object(
@@ -18,7 +18,8 @@ select 'eleganza-tower-apartamento-4200', 'GUA-0001', 'Eleganza Tower', 'Apartam
     'w', 1280,
     'h', (array[856,854,854,854,854,854,856,854,856,854,854,855,854,849])[n],
     'alt', case when n = 1 then 'Sala de jantar integrada com vista panorâmica para o mar, apartamento 4200 do Eleganza Tower' else '' end
-  ) order by n)
+  ) order by n),
+  false  -- o site original mostrava "Apartamento 4200"
 from generate_series(1, 14) as n
 on conflict (slug) do nothing;
 

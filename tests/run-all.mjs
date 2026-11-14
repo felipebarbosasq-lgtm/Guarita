@@ -4,7 +4,7 @@
 import { execSync, spawn } from 'node:child_process';
 const run = c => execSync(c, { stdio: 'inherit' });
 run('bash tests/local-supabase/setup.sh');
-for (const f of ['rls-test.sql', 'crm-test.sql']) {
+for (const f of ['rls-test.sql', 'crm-test.sql', 'unidade-test.sql']) {
   run('bash tests/local-supabase/setup.sh');
   const out = execSync(`cd /tmp && su postgres -c "psql -q -t -d guarita_test -f '${process.cwd()}/tests/local-supabase/${f}'" 2>&1`).toString();
   console.log(out.split('\n').map(l => l.trim()).filter(l => /^OK|FALH|ERRO|ERROR/.test(l)).join('\n'));

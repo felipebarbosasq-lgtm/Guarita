@@ -107,7 +107,9 @@
         <div class="f full"><label for="e-nome">Nome do empreendimento *</label><input id="e-nome" name="nome" required maxlength="120"><span class="err"></span></div>
         <div class="f"><label for="e-codigo">Código de referência</label><input id="e-codigo" name="codigo" maxlength="40" placeholder="Gerado automaticamente"><span class="err"></span></div>
         <div class="f"><label for="e-tipo">Tipo de imóvel *</label><input id="e-tipo" name="tipo" list="tipos" required maxlength="60"><datalist id="tipos"><option>Apartamento</option><option>Cobertura</option><option>Casa</option><option>Casa em condomínio</option><option>Sala comercial</option><option>Loja</option><option>Terreno</option><option>Studio</option></datalist><span class="err"></span></div>
-        <div class="f"><label for="e-complemento">Unidade / complemento</label><input id="e-complemento" name="complemento" maxlength="60" placeholder="Ex.: 4200"><span class="err"></span></div>
+        <div class="f"><label for="e-complemento">Nº do apartamento / unidade</label><input id="e-complemento" name="complemento" maxlength="60" placeholder="Ex.: 104"><span class="err"></span>
+         <label class="sw sw-unid"><input type="checkbox" name="mostrar_unidade" id="e-mostrar_unidade"><span></span><b id="lbl-unid">Nº do apartamento oculto no site</b></label>
+         <small class="adm-help">Desligado: só o painel vê o número do apartamento (a rua e o número do prédio continuam aparecendo). Ligado: o cliente também vê.</small></div>
         <div class="f"><label for="e-finalidade">Finalidade *</label><select id="e-finalidade" name="finalidade"><option value="venda">Venda</option><option value="locacao">Locação</option></select></div>
         <div class="f"><label for="e-status">Disponibilidade *</label><select id="e-status" name="status"><option value="disponivel">Disponível</option><option value="reservado">Reservado</option><option value="vendido">Vendido</option><option value="alugado">Alugado</option></select></div>
        </div>

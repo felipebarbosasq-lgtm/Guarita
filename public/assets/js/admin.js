@@ -30,6 +30,7 @@ function errMsg(e) {
   const m = (e && (e.message || e.error_description || e.msg)) || String(e);
   if (/duplicate key.*slug/i.test(m) || /imoveis_slug_key/.test(m)) return 'Já existe outro imóvel com este endereço de página. Altere o campo "Endereço da página".';
   if (/duplicate key.*codigo/i.test(m) || /imoveis_codigo_key/.test(m)) return 'Já existe outro imóvel com este código de referência.';
+  if (/ocultar_unidade/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem a opção de ocultar o apartamento. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-05-ocultar-unidade.sql (uma vez só).';
   if (/oportunidade|valor_anterior/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem os campos de Oportunidade. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-02-oportunidade.sql (uma vez só).';
   if (/valor_anterior_maior/.test(m)) return 'O valor anterior ("de") precisa ser maior que o valor atual.';
   if (/row-level security|permission denied|42501|acesso negado/i.test(m)) return 'Sua conta não tem permissão para esta ação.';
@@ -114,7 +115,7 @@ function renderList() {
     return `<li class="row" data-id="${esc(i.id)}" ${canOrder ? 'draggable="true"' : ''}>
       <span class="hd" aria-hidden="true" title="Arraste para reordenar">${canOrder ? '⋮⋮' : ''}</span>
       ${f ? `<img class="th" src="${esc(G.src(f.th || f.md))}" alt="" loading="lazy">` : '<span class="th"></span>'}
-      <div class="nm"><b>${esc(i.nome)}${i.complemento ? ' · ' + esc(i.complemento) : ''}</b><small>${esc(i.codigo)} · ${esc(fmt.loc(i))} · ${esc(fmt.price(i))}${fmt.status(i) ? ' · ' + fmt.status(i) : ''}</small></div>
+      <div class="nm"><b>${esc(i.nome)}${i.complemento ? ' · ' + esc(i.complemento) + (i.ocultar_unidade ? ' <span title="Nº do apartamento oculto no site" aria-label="(oculto no site)">🔒</span>' : '') : ''}</b><small>${esc(i.codigo)} · ${esc(fmt.loc(i))} · ${esc(fmt.price(i))}${fmt.status(i) ? ' · ' + fmt.status(i) : ''}</small></div>
       <div class="flags"><button type="button" class="pill" data-act="pub" aria-pressed="${!!i.publicado}">${i.publicado ? 'Publicado' : 'Não publicado'}</button><button type="button" class="pill gold" data-act="dest" aria-pressed="${!!i.destaque}">★ Destaque</button><button type="button" class="pill opo-p" data-act="opo" aria-pressed="${!!i.oportunidade}">Oportunidade</button></div>
       <div class="acts">
        <button type="button" class="ib" data-act="up" aria-label="Subir ${esc(i.nome)}" ${prevSame ? '' : 'disabled'}>↑</button>
@@ -186,13 +187,14 @@ const TXT = ['nome', 'codigo', 'tipo', 'complemento', 'endereco', 'bairro', 'cid
 function showList() { $('#s-edit').hidden = true; $('#s-list').hidden = false; scrollTo(0, 0); }
 function openEditor(im) {
   const isNew = !im;
-  im = im || { id: uid(), nome: '', tipo: 'Apartamento', finalidade: 'venda', status: 'disponivel', cidade: 'Balneário Camboriú', estado: 'SC', fotos: [], caracteristicas: [], publicado: false, destaque: false, oportunidade: false };
-  ed = { id: im.id, isNew, fotos: (im.fotos || []).map(f => ({ ...f })), removed: [], uploaded: [], busy: 0, dirty: false, slugTouched: !isNew, orig: im };
+  im = im || { id: uid(), nome: '', tipo: 'Apartamento', finalidade: 'venda', status: 'disponivel', cidade: 'Balneário Camboriú', estado: 'SC', fotos: [], caracteristicas: [], publicado: false, destaque: false, oportunidade: false, ocultar_unidade: true };
+  ed = { sufixo: Math.random().toString(36).slice(2, 6), id: im.id, isNew, fotos: (im.fotos || []).map(f => ({ ...f })), removed: [], uploaded: [], busy: 0, dirty: false, slugTouched: !isNew, orig: im };
   TXT.forEach(k => F(k).value = im[k] == null ? '' : im[k]);
   F('valor').value = money(im.valor); F('valor_anterior').value = money(im.valor_anterior); F('oportunidade').checked = !!im.oportunidade; F('area_privativa').value = dec(im.area_privativa); F('area_total').value = dec(im.area_total);
   INT.forEach(k => F(k).value = im[k] == null ? '' : im[k]);
   F('caracteristicas').value = (im.caracteristicas || []).join('\n');
   F('publicado').checked = !!im.publicado; F('destaque').checked = !!im.destaque;
+  F('mostrar_unidade').checked = im.ocultar_unidade === false; rotuloUnidade();
   $$('#f-edit .bad').forEach(x => x.classList.remove('bad')); $$('#f-edit .err, #e-err, #ph-err').forEach(x => x.textContent = '');
   $('#e-title').textContent = isNew ? 'Novo imóvel' : `Editar: ${im.nome}`;
   $('#b-del').hidden = isNew || !(me && me.gestor);
@@ -209,6 +211,7 @@ function collect() {
   o.caracteristicas = F('caracteristicas').value.split('\n').map(s => s.trim().replace(/^[-•*]\s*/, '')).filter(Boolean);
   o.descricao = o.descricao || ''; o.info_complementar = o.info_complementar || '';
   o.publicado = F('publicado').checked; o.destaque = F('destaque').checked; o.oportunidade = F('oportunidade').checked;
+  o.ocultar_unidade = !F('mostrar_unidade').checked;
   o.fotos = ed.fotos.filter(f => !f.tmp).map(({ lg, md, th, w, h, alt, files }) => ({ lg, md, th, w, h, alt: alt || '', files: files || [] }));
   return o;
 }
@@ -227,14 +230,23 @@ function validate(o) {
   if (o.area_total === 0) bad('area_total', 'Deixe em branco ou informe a área.');
   INT.forEach(k => { if (o[k] != null && (!Number.isInteger(o[k]) || o[k] < 0 || o[k] > 50)) bad(k, 'Use um número inteiro entre 0 e 50.'); });
   if (o.suites != null && o.dormitorios != null && o.suites > o.dormitorios) bad('suites', 'Não pode ser maior que o número de dormitórios.');
-  if (!o.slug) o.slug = slugify([o.nome, o.tipo, o.complemento].filter(Boolean).join(' '));
+  if (!o.slug) o.slug = autoSlug(o);
+  if (o.ocultar_unidade && o.complemento && slugTemUnidade(o.slug, o.complemento)) { o.slug = autoSlug(o); toast('O endereço da página foi trocado para não revelar o número do apartamento.'); }
   if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(o.slug)) bad('slug', 'Use só letras minúsculas, números e hífens.');
   if (o.publicado && !o.fotos.length) { errs.push(F('publicado')); $('#e-err').textContent = 'Para publicar, envie ao menos uma foto do imóvel.'; }
   return errs;
 }
+/* endereço da página: com o apartamento oculto, o número dele não pode aparecer no link */
+function autoSlug(o) {
+  const base = slugify([o.nome, o.tipo, o.ocultar_unidade ? '' : o.complemento].filter(Boolean).join(' '));
+  return o.ocultar_unidade && o.complemento ? `${base}-${slugify(o.codigo || (ed.orig && ed.orig.codigo) || '') || ed.sufixo}` : base;
+}
+const slugTemUnidade = (slug, comp) => { const u = slugify(comp); return !!u && ('-' + slug + '-').includes('-' + u + '-'); };
+function rotuloUnidade() { const on = F('mostrar_unidade').checked; $('#lbl-unid').textContent = on ? 'Nº do apartamento visível no site' : 'Nº do apartamento oculto no site'; }
 function preview() {
   const o = collect(); if (Number.isNaN(o.valor)) o.valor = null;
-  o.slug = o.slug || slugify([o.nome, o.tipo, o.complemento].filter(Boolean).join(' ')) || 'novo-imovel';
+  o.slug = o.slug || autoSlug(o) || 'novo-imovel';
+  if (o.ocultar_unidade) o.complemento = null; // a prévia mostra exatamente o que o cliente verá
   o.nome = o.nome || 'Nome do empreendimento';
   $('#pv').innerHTML = G.card(o);
   $('#lbl-valor').textContent = (F('finalidade').value === 'locacao' ? 'Aluguel mensal (R$)' : 'Valor (R$)') + (F('valor_anterior').value.trim() ? ', "por"' : '');
@@ -242,7 +254,8 @@ function preview() {
 $('#f-edit').addEventListener('input', e => {
   if (!ed) return; ed.dirty = true;
   if (e.target.name === 'slug') ed.slugTouched = !!e.target.value;
-  if (!ed.slugTouched && ['nome', 'tipo', 'complemento'].includes(e.target.name)) F('slug').value = slugify([F('nome').value, F('tipo').value, F('complemento').value].filter(Boolean).join(' '));
+  if (e.target.name === 'mostrar_unidade') rotuloUnidade();
+  if (!ed.slugTouched && ['nome', 'tipo', 'complemento', 'mostrar_unidade', 'codigo'].includes(e.target.name)) F('slug').value = autoSlug({ nome: F('nome').value, tipo: F('tipo').value, complemento: F('complemento').value.trim(), codigo: F('codigo').value.trim(), ocultar_unidade: !F('mostrar_unidade').checked });
   if (e.target.classList.contains('bad')) { e.target.classList.remove('bad'); const er = e.target.closest('.f') && e.target.closest('.f').querySelector('.err'); if (er) er.textContent = ''; }
   $('#e-err').textContent = '';
   preview();
@@ -428,7 +441,7 @@ $('#b-dwv').onclick = async () => {
     F('valor').value = money(im.valor); F('area_privativa').value = dec(im.area_privativa); F('area_total').value = dec(im.area_total);
     INT.forEach(k => F(k).value = im[k] == null ? '' : im[k]);
     F('caracteristicas').value = (im.caracteristicas || []).join('\n');
-    if (!ed.slugTouched || !F('slug').value) { ed.slugTouched = false; F('slug').value = slugify([im.nome, im.tipo, im.complemento].filter(Boolean).join(' ')); }
+    if (!ed.slugTouched || !F('slug').value) { ed.slugTouched = false; F('slug').value = autoSlug({ ...im, codigo: F('codigo').value.trim(), ocultar_unidade: !F('mostrar_unidade').checked }); }
     ed.dirty = true; preview();
     /* fotos: baixadas direto do DWV pelo navegador e otimizadas/enviadas como num envio normal */
     const urls = (out.fotos || []).slice(0, Math.max(0, 60 - ed.fotos.length)), files = [];

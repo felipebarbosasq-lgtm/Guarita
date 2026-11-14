@@ -70,23 +70,28 @@ function card(im) {
 
 /* dados: Supabase (API REST pública, só leitura de anúncios publicados) ou demonstração local */
 const COLS = '*'; // todas as colunas: novos campos do painel aparecem sem precisar mudar esta lista
+/* o site lê a "vitrine" imoveis_site, que já entrega o número do apartamento vazio quando ele está oculto.
+   Se o banco ainda não tiver a vitrine (atualização 5 não rodada), usa a tabela antiga e esconde aqui mesmo. */
+const semUnidade = l => l.map(im => (im.ocultar_unidade ? { ...im, complemento: null } : im));
 async function rest(q) {
-  const r = await fetch(`${CONFIG.supabaseUrl.replace(/\/$/, '')}/rest/v1/imoveis?${q}`, {
+  const get = tabela => fetch(`${CONFIG.supabaseUrl.replace(/\/$/, '')}/rest/v1/${tabela}?${q}`, {
     // chave antiga "anon" (JWT, começa com eyJ) vai também como Bearer; a nova "publishable" (sb_publishable_…) só no apikey
     headers: { apikey: CONFIG.supabaseAnonKey, ...(/^eyJ/.test(CONFIG.supabaseAnonKey) ? { Authorization: `Bearer ${CONFIG.supabaseAnonKey}` } : {}), Accept: 'application/json' }
   });
+  let r = await get('imoveis_site');
+  if (r.status === 404) r = await get('imoveis');
   if (!r.ok) throw new Error('Falha ao carregar imóveis (' + r.status + ')');
-  return r.json();
+  return semUnidade(await r.json());
 }
 const sortList = l => l.slice().sort((a, b) => (b.destaque === true) - (a.destaque === true) || (a.ordem || 0) - (b.ordem || 0));
 const data = {
   hasDB,
   async list() {
-    if (!hasDB) return sortList((window.GUARITA_DEMO || []).filter(i => i.publicado));
+    if (!hasDB) return semUnidade(sortList((window.GUARITA_DEMO || []).filter(i => i.publicado)));
     return rest(`select=${COLS}&publicado=eq.true&order=destaque.desc,ordem.asc,created_at.desc`);
   },
   async get(slug) {
-    if (!hasDB) return (window.GUARITA_DEMO || []).find(i => i.slug === slug && i.publicado) || null;
+    if (!hasDB) return semUnidade((window.GUARITA_DEMO || []).filter(i => i.slug === slug && i.publicado))[0] || null;
     const l = await rest(`select=${COLS}&publicado=eq.true&slug=eq.${encodeURIComponent(slug)}&limit=1`);
     return l[0] || null;
   }
@@ -119,5 +124,5 @@ function reveal(root = document) {
   setTimeout(() => els.forEach(e => { const r = e.getBoundingClientRect(); if (r.top < innerHeight && r.bottom > 0) e.classList.add('in'); }), 400);
 }
 
-window.Guarita = { CONFIG, $, $$, reduce, wa, esc, src, imovelUrl, fmt, card, data, chrome, reveal };
+window.Guarita = { semUnidade, CONFIG, $, $$, reduce, wa, esc, src, imovelUrl, fmt, card, data, chrome, reveal };
 })();
