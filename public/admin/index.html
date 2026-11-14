@@ -161,7 +161,15 @@
        </div>
       </fieldset>
 
-      <fieldset class="adm-box adm-interno"><legend>Origem do imóvel <span class="badge">🔒 só a equipe vê</span></legend>
+      <fieldset class="adm-box adm-interno"><legend>Origem e contato do imóvel <span class="badge">🔒 só a equipe vê</span></legend>
+       <p class="adm-help" style="margin:0 0 14px">Nada deste quadro aparece no site para o cliente. Todos os campos são opcionais.</p>
+       <div class="fg">
+        <div class="f"><label for="e-proprietario_nome">Nome do dono / responsável</label><input id="e-proprietario_nome" name="proprietario_nome" maxlength="120" autocomplete="off"><span class="err"></span></div>
+        <div class="f"><label for="e-proprietario_tipo">Quem é</label><select id="e-proprietario_tipo" name="proprietario_tipo"><option value="">Selecione</option><option value="proprietario">Proprietário</option><option value="responsavel">Responsável pelo imóvel</option><option value="corretor">Corretor / imobiliária parceira</option><option value="construtora">Construtora / incorporadora</option><option value="outro">Outro</option></select></div>
+        <div class="f full"><label for="e-proprietario_telefone">Telefone / WhatsApp</label>
+         <div class="tel-row"><input id="e-proprietario_telefone" name="proprietario_telefone" type="tel" inputmode="tel" placeholder="(47) 99999-9999" autocomplete="off"><a class="btn line" id="b-prop-wa" href="#" target="_blank" rel="noopener" hidden>💬 Conversar</a></div>
+         <span class="err"></span></div>
+       </div>
        <div class="f full"><label for="e-origem_captacao">De onde veio este imóvel?</label>
         <textarea id="e-origem_captacao" name="origem_captacao" rows="4" maxlength="4000" placeholder="Ex.: captado com o proprietário Sr. João, (47) 99999-0000, em 10/11; parceria com a corretora X; DWV, construtora Y…"></textarea>
         <small class="adm-help">Escreva o que quiser: proprietário, parceiro, comissão combinada, link de origem. Essas informações nunca aparecem no site para o cliente.</small></div>

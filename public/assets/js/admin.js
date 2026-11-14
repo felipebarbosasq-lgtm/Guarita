@@ -30,6 +30,8 @@ function errMsg(e) {
   const m = (e && (e.message || e.error_description || e.msg)) || String(e);
   if (/duplicate key.*slug/i.test(m) || /imoveis_slug_key/.test(m)) return 'Já existe outro imóvel com este endereço de página. Altere o campo "Endereço da página".';
   if (/duplicate key.*codigo/i.test(m) || /imoveis_codigo_key/.test(m)) return 'Já existe outro imóvel com este código de referência.';
+  if (/proprietario_/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem os campos de contato do dono. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-07-contato-proprietario.sql (uma vez só).';
+  if (/proprietario_ok/.test(m)) return 'Telefone do dono/responsável inválido: use DDD + número.';
   if (/origem_captacao/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem o campo "Origem do imóvel". No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-06-origem-imovel.sql (uma vez só).';
   if (/ocultar_unidade/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem a opção de ocultar o apartamento. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-05-ocultar-unidade.sql (uma vez só).';
   if (/oportunidade|valor_anterior/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem os campos de Oportunidade. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-02-oportunidade.sql (uma vez só).';
@@ -184,7 +186,7 @@ async function removeImovel(im) {
 /* ---------- editor ---------- */
 const F = name => $('#f-edit').elements[name];
 const NUM = ['valor', 'valor_anterior', 'area_privativa', 'area_total'], INT = ['dormitorios', 'suites', 'banheiros', 'vagas'];
-const TXT = ['nome', 'codigo', 'tipo', 'complemento', 'endereco', 'bairro', 'cidade', 'estado', 'descricao', 'info_complementar', 'origem_captacao', 'finalidade', 'status', 'slug'];
+const TXT = ['nome', 'codigo', 'tipo', 'complemento', 'endereco', 'bairro', 'cidade', 'estado', 'descricao', 'info_complementar', 'origem_captacao', 'proprietario_nome', 'proprietario_tipo', 'finalidade', 'status', 'slug'];
 function showList() { $('#s-edit').hidden = true; $('#s-list').hidden = false; scrollTo(0, 0); }
 function openEditor(im) {
   const isNew = !im;
@@ -196,6 +198,7 @@ function openEditor(im) {
   F('caracteristicas').value = (im.caracteristicas || []).join('\n');
   F('publicado').checked = !!im.publicado; F('destaque').checked = !!im.destaque;
   F('mostrar_unidade').checked = im.ocultar_unidade === false; rotuloUnidade();
+  F('proprietario_telefone').value = foneFmt(im.proprietario_telefone || ''); atalhoDono();
   $$('#f-edit .bad').forEach(x => x.classList.remove('bad')); $$('#f-edit .err, #e-err, #ph-err').forEach(x => x.textContent = '');
   $('#e-title').textContent = isNew ? 'Novo imóvel' : `Editar: ${im.nome}`;
   $('#b-del').hidden = isNew || !(me && me.gestor);
@@ -213,6 +216,7 @@ function collect() {
   o.descricao = o.descricao || ''; o.info_complementar = o.info_complementar || '';
   o.publicado = F('publicado').checked; o.destaque = F('destaque').checked; o.oportunidade = F('oportunidade').checked;
   o.ocultar_unidade = !F('mostrar_unidade').checked;
+  o.proprietario_telefone = F('proprietario_telefone').value.replace(/\D/g, '') || null;
   o.fotos = ed.fotos.filter(f => !f.tmp).map(({ lg, md, th, w, h, alt, files }) => ({ lg, md, th, w, h, alt: alt || '', files: files || [] }));
   return o;
 }
@@ -226,6 +230,7 @@ function validate(o) {
   if (!/^[A-Z]{2}$/.test(o.estado)) bad('estado', 'Use a sigla do estado, ex.: SC.');
   NUM.forEach(k => { if (Number.isNaN(o[k]) || (o[k] != null && o[k] < 0)) bad(k, 'Número inválido. Ex.: 1.250.000,00'); });
   if (o.area_privativa === 0) bad('area_privativa', 'Deixe em branco ou informe a área.');
+  if (o.proprietario_telefone && (o.proprietario_telefone.length < 10 || o.proprietario_telefone.length > 13)) bad('proprietario_telefone', 'Use DDD + número, ex.: (47) 99999-9999.');
   if (o.valor_anterior === 0) o.valor_anterior = null;
   if (o.valor_anterior != null && !Number.isNaN(o.valor_anterior) && (o.valor == null || o.valor_anterior <= o.valor)) bad('valor_anterior', o.valor == null ? 'Informe também o valor atual ("por").' : 'Precisa ser maior que o valor atual.');
   if (o.area_total === 0) bad('area_total', 'Deixe em branco ou informe a área.');
@@ -237,6 +242,12 @@ function validate(o) {
   if (o.publicado && !o.fotos.length) { errs.push(F('publicado')); $('#e-err').textContent = 'Para publicar, envie ao menos uma foto do imóvel.'; }
   return errs;
 }
+/* contato do dono/responsável (interno): máscara e atalho para o WhatsApp */
+function foneFmt(v) { const d = String(v).replace(/\D/g, '').slice(0, 13); const n = d.length > 11 && d.startsWith('55') ? d.slice(2) : d;
+  return n.length > 6 ? `(${n.slice(0, 2)}) ${n.slice(2, n.length > 10 ? 7 : 6)}-${n.slice(n.length > 10 ? 7 : 6)}` : n.length > 2 ? `(${n.slice(0, 2)}) ${n.slice(2)}` : n; }
+function atalhoDono() { const d = F('proprietario_telefone').value.replace(/\D/g, ''), a = $('#b-prop-wa'); a.hidden = d.length < 10; if (!a.hidden) a.href = 'https://wa.me/' + (d.length <= 11 ? '55' + d : d); }
+F('proprietario_telefone').addEventListener('input', () => { F('proprietario_telefone').value = foneFmt(F('proprietario_telefone').value); atalhoDono(); });
+
 /* endereço da página: com o apartamento oculto, o número dele não pode aparecer no link */
 function autoSlug(o) {
   const base = slugify([o.nome, o.tipo, o.ocultar_unidade ? '' : o.complemento].filter(Boolean).join(' '));

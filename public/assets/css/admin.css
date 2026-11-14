@@ -195,3 +195,7 @@ header.adm-top{position:sticky;top:0;inset:auto;height:auto;transition:none}
 .sw-unid input:checked+span{background:var(--gold)}
 .adm-interno{border-color:#cdbf9f;background:repeating-linear-gradient(135deg,#fff,#fff 12px,#fbf8f1 12px,#fbf8f1 24px)}
 .adm-interno legend .badge{vertical-align:3px}
+.tel-row{display:flex;gap:10px;align-items:stretch}
+.tel-row input{flex:1}
+.tel-row .btn{flex:none;min-height:48px;padding:0 16px}
+.adm-interno .fg{margin-bottom:18px}

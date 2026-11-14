@@ -72,7 +72,7 @@ function card(im) {
 const COLS = '*'; // todas as colunas: novos campos do painel aparecem sem precisar mudar esta lista
 /* o site lê a "vitrine" imoveis_site, que já entrega o número do apartamento vazio quando ele está oculto.
    Se o banco ainda não tiver a vitrine (atualização 5 não rodada), usa a tabela antiga e esconde aqui mesmo. */
-const semUnidade = l => l.map(({ origem_captacao, ...im }) => (im.ocultar_unidade ? { ...im, complemento: null } : im));
+const semUnidade = l => l.map(({ origem_captacao, proprietario_nome, proprietario_telefone, proprietario_tipo, ...im }) => (im.ocultar_unidade ? { ...im, complemento: null } : im));
 async function rest(q) {
   const get = tabela => fetch(`${CONFIG.supabaseUrl.replace(/\/$/, '')}/rest/v1/${tabela}?${q}`, {
     // chave antiga "anon" (JWT, começa com eyJ) vai também como Bearer; a nova "publishable" (sb_publishable_…) só no apikey

@@ -134,6 +134,7 @@ Rode cada um **uma vez**, em ordem, no **SQL Editor** do Supabase (*New query > 
 - `atualizacao-04-crm-historico-rodizio.sql`: histórico, rodízio/manual e contatos do site no CRM.
 - `atualizacao-05-ocultar-unidade.sql`: botão para ocultar o número do apartamento no site.
 - `atualizacao-06-origem-imovel.sql`: campo interno "Origem do imóvel" (inclui a proteção da 5).
+- `atualizacao-07-contato-proprietario.sql`: contato do dono/responsável (inclui a 5 e a 6).
 Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizações) e do `seed.sql`.
 
 ### 3.7 Publicar atualizações futuras
@@ -164,7 +165,8 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
   (função `netlify/functions/dwv.mjs`, só para administradores logados), não a API oficial do DWV: se o DWV mudar a
   página, a importação avisa e o cadastro manual continua funcionando. Preços alterados depois no DWV não se atualizam sozinhos.
   Confirme com a construtora/corretora se o imóvel pode ser divulgado no seu site.
-- **Origem do imóvel (interno):** no cadastro, campo livre para anotar de onde o imóvel veio (proprietário, parceria,
+- **Origem e contato do imóvel (interno):** no cadastro, nome, telefone/WhatsApp (com atalho "Conversar") e tipo do
+  dono ou responsável, todos opcionais, e um campo livre para anotar de onde o imóvel veio (proprietário, parceria,
   comissão, link). Só a equipe logada vê; o campo não existe na vitrine pública `imoveis_site`. A importação do DWV
   preenche sozinha com a data, a construtora e o link do compartilhamento.
 - **Nº do apartamento oculto:** no cadastro, o botão abaixo do campo *Nº do apartamento / unidade* define se o cliente
