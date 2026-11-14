@@ -39,7 +39,7 @@ G.chrome();
    Movimento contínuo da esquerda para a direita, loop infinito sem saltos (cópias da lista),
    arrastar com o dedo/mouse, rolagem horizontal do touchpad, setas e teclado. Interações pausam
    o movimento, que volta suavemente alguns segundos depois. Com "movimento reduzido" não anda sozinho. */
-function Carousel(root) {
+function Carousel(root, itemHTML = im => G.card(im)) {
   const vp = $('.car-vp', root), track = $('.car-track', root), pp = $('.car-pp', root);
   const SPEED = () => innerWidth < 641 ? 26 : 36; // px por segundo
   let list = [], count = 0, setW = 0, step = 0, x = 0, v = 0, isStatic = true;
@@ -53,7 +53,7 @@ function Carousel(root) {
     count = list.length;
     const keep = setW ? x / setW : null;
     if (!count) { root.classList.add('static'); track.innerHTML = ''; return; }
-    const one = list.map(im => G.card(im)).join('');
+    const one = list.map(itemHTML).join('');
     track.innerHTML = one; track.style.transform = '';
     isStatic = count <= Math.floor(per());
     root.classList.toggle('static', isStatic);
@@ -64,8 +64,10 @@ function Carousel(root) {
     step = first + gap; setW = step * count;
     const sets = 3 + Math.ceil(vp.clientWidth / setW);
     let html = '';
-    for (let s = 0; s < sets; s++) html += s === 1 ? one : one.replace(/<article class="prop/g, '<article aria-hidden="true" class="prop').replace(/<a class="btn"/g, '<a class="btn" tabindex="-1"'); // cópias: clicáveis, fora do Tab e do leitor de tela
+    for (let s = 0; s < sets; s++) html += one;
     track.innerHTML = html;
+    // cópias do loop: continuam clicáveis, mas ficam fora do Tab e do leitor de tela
+    [...track.children].forEach((el, k) => { if (k < count || k >= 2 * count) { el.setAttribute('aria-hidden', 'true'); el.querySelectorAll('a,button').forEach(a => a.tabIndex = -1); } });
     x = keep !== null ? keep * setW : -setW; norm(); paint();
     if (!raf) { last = now(); raf = requestAnimationFrame(loop); }
   }
@@ -120,7 +122,7 @@ function Carousel(root) {
   });
   const end = e => {
     if (!drag || (e && e.pointerId !== drag.id)) return;
-    if (drag.on) { fling = Math.max(-2500, Math.min(2500, drag.vel)); pauseFor(3500); }
+    if (drag.on) { fling = Math.max(-2500, Math.min(2500, drag.vel)); pauseFor(3500); setTimeout(() => { moved = false; }, 400); } // só o clique logo após arrastar é ignorado
     drag = null; vp.classList.remove('drag');
   };
   vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end); vp.addEventListener('lostpointercapture', end);
@@ -137,7 +139,7 @@ function Carousel(root) {
   root.addEventListener('focusin', e => {
     if (!e.target.matches(':focus-visible')) return; // clique do mouse não pausa; só a navegação pelo teclado
     focus = true;
-    const c = e.target.closest('.prop');
+    const c = e.target.closest('.car-track > *');
     if (!c || isStatic) return;
     vp.scrollLeft = 0; // o navegador não deve rolar a área oculta
     const l = c.offsetLeft, w = c.offsetWidth;
@@ -152,14 +154,53 @@ function Carousel(root) {
 (async () => {
   const root = $('#car'), msg = $('#car-msg');
   const car = Carousel(root);
+  let todos = [];
   try {
-    const list = await G.data.list();
-    if (!list.length) { msg.hidden = false; root.hidden = true; return; }
-    car.render(list);
+    todos = await G.data.list();
+    if (!todos.length) { msg.hidden = false; root.hidden = true; return; }
+    car.render(todos);
   } catch (err) {
     console.warn(err);
-    msg.hidden = false; root.hidden = true;
+    msg.hidden = false; root.hidden = true; return;
   }
+  /* ===== BUSCA (lupa): Comprar/Alugar e região ===== */
+  const form = $('#buscar'), res = $('#busca-res'), selReg = $('#busca-reg');
+  const fold = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const REGIOES = {
+    bc: im => /balneario camboriu|bal\. camboriu/.test(fold(im.cidade)),
+    itapema: im => fold(im.cidade) === 'itapema',
+    portobelo: im => fold(im.cidade) === 'porto belo',
+    itajai: im => fold(im.cidade) === 'itajai',
+    praiabrava: im => /praia brava/.test(fold([im.bairro, im.endereco, im.nome].join(' '))),
+    florida: im => im.estado === 'FL' || /florida|miami|orlando|tampa|fort lauderdale|naples|boca raton/.test(fold([im.cidade, im.estado, im.endereco].join(' ')))
+  };
+  let fin = '';
+  function buscar(rolar) {
+    const reg = selReg.value, testa = REGIOES[reg];
+    const l = todos.filter(im => (!fin || im.finalidade === fin) && (!testa || testa(im)));
+    const filtrando = !!(fin || reg);
+    const nomeReg = reg ? selReg.selectedOptions[0].textContent : '';
+    const oQue = [fin === 'venda' ? 'à venda' : fin === 'locacao' ? 'para alugar' : '', nomeReg ? 'em ' + nomeReg : ''].filter(Boolean).join(' ');
+    res.hidden = !filtrando;
+    if (l.length) {
+      root.hidden = false; msg.hidden = true; car.render(l);
+      res.innerHTML = filtrando ? `<span><b>${l.length}</b> ${l.length === 1 ? 'imóvel encontrado' : 'imóveis encontrados'} ${G.esc(oQue)}.</span> <button type="button" class="link" data-limpar>Ver todos</button>` : '';
+    } else {
+      root.hidden = true; msg.hidden = true;
+      const txt = `Olá! Vim pelo site da Guarita Imobiliária e procuro um imóvel ${oQue}.`;
+      res.innerHTML = `<span>Ainda não temos imóveis ${G.esc(oQue)} publicados no site, mas a Guarita pode encontrar para você.</span> <a class="btn gold" href="${G.esc(wa(txt))}" target="_blank" rel="noopener">Falar com um especialista</a> <button type="button" class="link" data-limpar>Ver todos os imóveis</button>`;
+    }
+    if (rolar) $('#imoveis').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+  }
+  $$('[data-fin]', form).forEach(b => b.onclick = () => { fin = b.dataset.fin; $$('[data-fin]', form).forEach(x => x.setAttribute('aria-pressed', x === b)); buscar(); });
+  selReg.addEventListener('change', () => buscar());
+  form.addEventListener('submit', e => { e.preventDefault(); buscar(true); });
+  res.addEventListener('click', e => { if (!e.target.closest('[data-limpar]')) return; fin = ''; selReg.value = ''; $$('[data-fin]', form).forEach(x => x.setAttribute('aria-pressed', x.dataset.fin === '')); buscar(); });
+  // ?regiao=florida&finalidade=locacao no endereço já abre a busca filtrada
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('regiao') && REGIOES[qs.get('regiao')]) selReg.value = qs.get('regiao');
+  if (['venda', 'locacao'].includes(qs.get('finalidade'))) { fin = qs.get('finalidade'); $$('[data-fin]', form).forEach(x => x.setAttribute('aria-pressed', x.dataset.fin === fin)); }
+  if (fin || selReg.value) buscar(true);
 })();
 
 G.reveal();
@@ -176,11 +217,26 @@ tabs.forEach((t, k) => {
   };
 });
 
-/* cartões de região: abrem o atendimento de compra já com a região escolhida */
-$$('[data-regiao]').forEach(a => a.addEventListener('click', () => {
+/* lupa do topo: vai para a busca */
+$$('[data-busca]').forEach(a => a.addEventListener('click', e => {
+  e.preventDefault(); const f = $('#buscar'); f.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  setTimeout(() => $('#busca-reg').focus({ preventScroll: true }), reduce ? 0 : 600);
+}));
+if (location.hash === '#buscar') setTimeout(() => $('#busca-reg').focus({ preventScroll: true }), 300);
+
+/* ===== ÁREAS DE ATUAÇÃO: carrossel em ordem aleatória, automático e com o dedo ===== */
+(() => {
+  const root = $('#car-regs'); if (!root) return;
+  const itens = $$('.reg-i', root).map(el => el.outerHTML);
+  for (let i = itens.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [itens[i], itens[j]] = [itens[j], itens[i]]; }
+  Carousel(root, h => h).render(itens);
+})();
+/* cartões de região (inclusive as cópias do carrossel): abrem o atendimento de compra com a região escolhida */
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-regiao]'); if (!a) return;
   selectTab($('#tab-comprar')); $('#c-reg').value = a.dataset.regiao;
   setTimeout(() => $('#c-nome').focus({ preventScroll: true }), reduce ? 0 : 700);
-}));
+});
 
 /* ===== FORMULÁRIOS: validação e envio pelo WhatsApp (sem e-mail do visitante) ===== */
 $$('input[type=tel]').forEach(i => i.addEventListener('input', () => {

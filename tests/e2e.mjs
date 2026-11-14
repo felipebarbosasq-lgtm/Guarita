@@ -321,6 +321,60 @@ console.log('\n3b. Importar do DWV');
   await ctx.close();
 }
 
+/* ================= 4b. busca (lupa), regiões em carrossel e botão do WhatsApp ================= */
+console.log('\n4b. Busca, regiões e WhatsApp');
+for (const [label, opts] of [['computador', { viewport: { width: 1440, height: 900 } }], ['celular', { ...devices['iPhone 13'] }]]) {
+  const { ctx, p } = await page(opts);
+  await p.goto(SITE + '/'); await p.waitForSelector('#car .prop:not(.skel)');
+  ok(await p.locator('header .lupa').isVisible(), `${label}: lupa visível no topo`);
+  await p.click('header .lupa'); await sleep(900);
+  ok(await p.evaluate(() => document.activeElement && document.activeElement.id === 'busca-reg'), `${label}: lupa leva à busca`);
+  await p.selectOption('#busca-reg', 'itapema'); await sleep(300);
+  const nomes = await p.locator('#car .prop:not([aria-hidden]) h3').allInnerTexts();
+  ok(nomes.length === 1 && nomes[0] === 'Teste Dois' && (await p.locator('#busca-res').innerText()).replace(/\s+/g, ' ').includes('1 imóvel encontrado em Itapema'), `${label}: filtro Itapema mostra só os imóveis de Itapema`);
+  await p.selectOption('#busca-reg', 'florida'); await sleep(300);
+  const r = await p.locator('#busca-res').innerText();
+  ok(await p.locator('#car').isHidden() && /Flórida/.test(r) && decodeURIComponent(await p.locator('#busca-res a.btn').getAttribute('href')).includes('procuro um imóvel em Flórida (EUA)'), `${label}: sem imóveis na Flórida, oferece falar com um especialista`);
+  await p.click('#busca-res [data-limpar]'); await p.click('.busca-fin [data-fin=locacao]'); await sleep(300);
+  ok(await p.locator('#car').isHidden() && (await p.locator('#busca-res').innerText()).includes('para alugar'), `${label}: filtro Alugar`);
+  await p.click('.busca-fin [data-fin=venda]'); await sleep(300);
+  ok(await p.locator('#car .prop:not([aria-hidden])').count() === 4, `${label}: filtro Comprar mostra os imóveis à venda`);
+  await p.click('#busca-res [data-limpar]');
+  // regiões
+  const regs = await p.locator('#car-regs .reg-i:not([aria-hidden]) h3').allInnerTexts();
+  ok(regs.length === 5 && regs.includes('Flórida'), `${label}: 5 regiões, incluindo a Flórida (ordem: ${regs.join(', ')})`);
+  await p.locator('#car-regs').scrollIntoViewIfNeeded(); await p.mouse.move(2, 2); await sleep(1200); // mouse fora: o carrossel pausa com o mouse em cima
+  const tx = () => p.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector('#car-regs .car-track')).transform).m41);
+  const a0 = await tx(); await sleep(1500); const a1 = await tx();
+  ok(a1 > a0 + 10, `${label}: regiões rolam sozinhas da esquerda para a direita (${a0.toFixed(0)} → ${a1.toFixed(0)})`);
+  const box = await p.locator('#car-regs .car-vp').boundingBox();
+  if (opts.hasTouch) {
+    const cdp = await ctx.newCDPSession(p); const y = box.y + box.height / 3, x0 = box.x + box.width * .8;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y }] });
+    for (let k = 1; k <= 10; k++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x0 - k * 22, y }] }); await sleep(16); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } else {
+    await p.mouse.move(box.x + box.width * .7, box.y + box.height / 3); await p.mouse.down();
+    for (let k = 1; k <= 10; k++) { await p.mouse.move(box.x + box.width * .7 - k * 25, box.y + box.height / 3); await sleep(16); }
+    await p.mouse.up(); await p.mouse.move(5, 5);
+  }
+  await sleep(150); const a2 = await tx();
+  ok(a2 < a1 - 80, `${label}: regiões também deslizam com ${opts.hasTouch ? 'o dedo' : 'o mouse'}`);
+  // clicar na Flórida abre o atendimento com a região
+  await p.evaluate(() => { const a = [...document.querySelectorAll('#car-regs [data-regiao="Flórida (EUA)"]')].find(x => { const r = x.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; }) || document.querySelector('#car-regs .reg-i:not([aria-hidden]) [data-regiao="Flórida (EUA)"]'); a.click(); });
+  await sleep(900);
+  ok(await p.inputValue('#c-reg') === 'Flórida (EUA)', `${label}: cartão da Flórida abre o atendimento com "Flórida (EUA)"`);
+  // botão verde 2 cm mais alto
+  await p.evaluate(() => scrollTo(0, innerHeight * 2)); await sleep(500);
+  const wb = await p.evaluate(() => innerHeight - document.querySelector('.wa').getBoundingClientRect().bottom);
+  ok(wb >= 90 && wb <= 100, `${label}: botão do WhatsApp 2 cm mais alto (${wb.toFixed(0)} px da borda; antes 18 px)`);
+  ok(await noHScroll(p), `${label}: sem rolagem horizontal`);
+  await p.screenshot({ path: path.join(SHOTS, `busca-${label}.png`) });
+  await p.goto(SITE + '/?regiao=itapema'); await p.waitForSelector('#car .prop:not(.skel)'); await sleep(400);
+  ok((await p.locator('#car .prop:not([aria-hidden]) h3').allInnerTexts()).join() === 'Teste Dois', `${label}: link com ?regiao=itapema já abre filtrado`);
+  await ctx.close();
+}
+
 /* ================= 4. carrossel com vários imóveis ================= */
 console.log('\n4. Carrossel automático');
 for (const [label, opts, per] of [['computador', { viewport: { width: 1440, height: 900 } }, 3], ['tablet', { viewport: { width: 820, height: 1180 }, hasTouch: true }, 2], ['celular', { ...devices['iPhone 13'] }, 1]]) {
@@ -329,15 +383,15 @@ for (const [label, opts, per] of [['computador', { viewport: { width: 1440, heig
   await p.locator('#car').scrollIntoViewIfNeeded(); await sleep(400);
   const names = await p.locator('#car .prop:not([aria-hidden]) h3').allInnerTexts();
   ok(names.length === 4 && !names.includes('Teste Quatro'), `${label}: só imóveis publicados (${names.length})`);
-  const vis = await p.evaluate(() => { const vp = document.querySelector('.car-vp').getBoundingClientRect(); return [...document.querySelectorAll('#car .prop')].filter(c => { const r = c.getBoundingClientRect(); return r.left >= vp.left - 2 && r.right <= vp.right + 2; }).length; });
+  const vis = await p.evaluate(() => { const vp = document.querySelector('#car .car-vp').getBoundingClientRect(); return [...document.querySelectorAll('#car .prop')].filter(c => { const r = c.getBoundingClientRect(); return r.left >= vp.left - 2 && r.right <= vp.right + 2; }).length; });
   ok(Math.abs(vis - per) <= 1, `${label}: ${vis} cartão(ões) inteiros visíveis (esperado ~${per})`);
   const hs = await p.locator('#car .prop').evaluateAll(cs => [...new Set(cs.map(c => Math.round(c.getBoundingClientRect().height)))]);
   ok(hs.length === 1, `${label}: cartões padronizados com mesma altura ${hs}`);
-  const tx = () => p.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector('.car-track')).transform).m41);
+  const tx = () => p.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector('#car .car-track')).transform).m41);
   const a = await tx(); await sleep(1500); const b = await tx();
   ok(b > a + 10, `${label}: anda sozinho da esquerda para a direita (${a.toFixed(0)} → ${b.toFixed(0)})`);
   // gesto de arrastar
-  const box = await p.locator('.car-vp').boundingBox();
+  const box = await p.locator('#car .car-vp').boundingBox();
   const c0 = await tx();
   if (opts.hasTouch) {
     const cdp = await ctx.newCDPSession(p);
@@ -358,14 +412,14 @@ for (const [label, opts, per] of [['computador', { viewport: { width: 1440, heig
   await sleep(4200); const e0 = await tx(); await sleep(1000); const e1 = await tx();
   ok(e1 > e0 + 5, `${label}: retoma o movimento sozinho`);
   if (label === 'computador') {
-    const n0 = await tx(); await p.click('.car-next'); await sleep(900); const n1 = await tx();
+    const n0 = await tx(); await p.click('#car .car-next'); await sleep(900); const n1 = await tx();
     ok(n1 < n0 - 200, 'setas discretas navegam');
     const w0 = await tx(); await p.mouse.move(box.x + 200, box.y + 100); await p.mouse.wheel(300, 0); await sleep(100); const w1 = await tx();
     ok(w1 < w0 - 100, 'rolagem horizontal do touchpad navega');
     // loop sem saltos: o deslocamento fica sempre dentro da faixa e nunca há espaço vazio
-    const gaps = await p.evaluate(async () => { const vp = document.querySelector('.car-vp').getBoundingClientRect(); let bad = 0; for (let k = 0; k < 40; k++) { await new Promise(r => setTimeout(r, 50)); const cs = [...document.querySelectorAll('#car .prop')].map(c => c.getBoundingClientRect()); if (!cs.some(r => r.left <= vp.left + 1) || !cs.some(r => r.right >= vp.right - 1)) bad++; } return bad; });
+    const gaps = await p.evaluate(async () => { const vp = document.querySelector('#car .car-vp').getBoundingClientRect(); let bad = 0; for (let k = 0; k < 40; k++) { await new Promise(r => setTimeout(r, 50)); const cs = [...document.querySelectorAll('#car .prop')].map(c => c.getBoundingClientRect()); if (!cs.some(r => r.left <= vp.left + 1) || !cs.some(r => r.right >= vp.right - 1)) bad++; } return bad; });
     ok(gaps === 0, 'loop infinito sem espaços vazios');
-    const vb = await p.evaluate(() => { const vp = document.querySelector('.car-vp').getBoundingClientRect(); const a = [...document.querySelectorAll('#car .prop a.btn')].find(x => { const r = x.getBoundingClientRect(); return r.left > vp.left + 40 && r.right < vp.right - 40; }); a.dataset.alvo = '1'; return a.closest('.prop').hasAttribute('aria-hidden'); });
+    const vb = await p.evaluate(() => { const vp = document.querySelector('#car .car-vp').getBoundingClientRect(); const a = [...document.querySelectorAll('#car .prop a.btn')].find(x => { const r = x.getBoundingClientRect(); return r.left > vp.left + 40 && r.right < vp.right - 40; }); a.dataset.alvo = '1'; return a.closest('.prop').hasAttribute('aria-hidden'); });
     await p.mouse.move(box.x + box.width / 2, box.y + 40); await sleep(1500); // mouse sobre o carrossel: ele desacelera e para
     await p.click('#car a[data-alvo]');
     await p.waitForURL(/\/imovel\//); ok(true, `clique em "Ver imóvel" no carrossel abre a página (cartão ${vb ? 'cópia do loop' : 'original'})`);
@@ -377,7 +431,7 @@ for (const [label, opts, per] of [['computador', { viewport: { width: 1440, heig
 {
   const { ctx, p } = await page({ reducedMotion: 'reduce' });
   await p.goto(SITE + '/'); await p.waitForSelector('#car .prop:not(.skel)'); await p.locator('#car').scrollIntoViewIfNeeded();
-  const t = () => p.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector('.car-track')).transform).m41);
+  const t = () => p.evaluate(() => new DOMMatrix(getComputedStyle(document.querySelector('#car .car-track')).transform).m41);
   const a = await t(); await sleep(1500); const b = await t();
   ok(Math.abs(a - b) < 1, 'movimento reduzido: carrossel não anda sozinho');
   const anim = await p.evaluate(() => getComputedStyle(document.querySelector('.slide.on img')).animationName);

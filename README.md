@@ -143,6 +143,14 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
   ou rode `netlify deploy --build --prod`. WhatsApp, e-mail, Instagram e CRECI ficam em `public/assets/js/config.js`.
 - O banco e as fotos ficam no Supabase e **não** são afetados por novas publicações.
 
+## 3.8 Busca e regiões no site
+- **Lupa:** ícone no topo (em todas as páginas) e barra de busca na seção de imóveis: *Todos / Comprar / Alugar* e região
+  (Balneário Camboriú, Itapema, Porto Belo, Itajaí, Praia Brava, Flórida/EUA). Sem resultados, oferece falar com um
+  especialista pelo WhatsApp já com o pedido. Links como `/?regiao=itapema&finalidade=venda` abrem a busca filtrada.
+  Imóveis da Flórida: cadastre com estado **FL** (ou cidade Miami, Orlando, etc.).
+- **Áreas de atuação:** cartões em carrossel automático, em ordem aleatória a cada visita, que também deslizam com o dedo,
+  incluindo **Flórida, Estados Unidos** (foto: skyline de Miami, Wilfredor, Wikimedia Commons, domínio público CC0).
+
 ## 4. Painel administrativo (`/admin/`)
 - Login com e-mail e senha individuais; "Esqueci minha senha" envia um link de redefinição.
 - **Lista:** pesquisa por nome, cidade, bairro ou código; filtro (publicados, não publicados, destaque);
