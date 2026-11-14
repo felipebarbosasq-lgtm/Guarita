@@ -133,6 +133,7 @@ Rode cada um **uma vez**, em ordem, no **SQL Editor** do Supabase (*New query > 
 - `atualizacao-03-crm-equipe-clientes.sql`: CRM, equipe e clientes.
 - `atualizacao-04-crm-historico-rodizio.sql`: histórico, rodízio/manual e contatos do site no CRM.
 - `atualizacao-05-ocultar-unidade.sql`: botão para ocultar o número do apartamento no site.
+- `atualizacao-06-origem-imovel.sql`: campo interno "Origem do imóvel" (inclui a proteção da 5).
 Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizações) e do `seed.sql`.
 
 ### 3.7 Publicar atualizações futuras
@@ -157,10 +158,15 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
   inteira e toque em **Importar do DWV**. Nome, unidade, tipo, endereço, bairro (quando vem na mensagem), valor, áreas,
   quartos, suítes, banheiros, vagas, características, condomínio, uma descrição montada com esses dados e todas as fotos
   são preenchidos; as fotos são otimizadas e guardadas no Supabase do site. Confira, escolha a capa, ligue *Publicado* e salve.
-  Dados pessoais do corretor que compartilhou não são importados. A leitura usa a página pública de compartilhamento
+  Dados pessoais do corretor que compartilhou não são importados. As fotos são baixadas em lotes de 4 (pouca memória, bom
+  para iPad), com nova tentativa; se o navegador não conseguir baixar direto do DWV, vêm pela função `/api/dwv-foto` do
+  próprio site. Tocar em *Importar* de novo (antes de salvar) busca só as fotos que faltaram. A leitura usa a página pública de compartilhamento
   (função `netlify/functions/dwv.mjs`, só para administradores logados), não a API oficial do DWV: se o DWV mudar a
   página, a importação avisa e o cadastro manual continua funcionando. Preços alterados depois no DWV não se atualizam sozinhos.
   Confirme com a construtora/corretora se o imóvel pode ser divulgado no seu site.
+- **Origem do imóvel (interno):** no cadastro, campo livre para anotar de onde o imóvel veio (proprietário, parceria,
+  comissão, link). Só a equipe logada vê; o campo não existe na vitrine pública `imoveis_site`. A importação do DWV
+  preenche sozinha com a data, a construtora e o link do compartilhamento.
 - **Nº do apartamento oculto:** no cadastro, o botão abaixo do campo *Nº do apartamento / unidade* define se o cliente
   vê o número do apartamento (ex.: 104). Desligado (padrão dos imóveis novos), o número some do cartão, da página, do
   título, do link da página, da prévia no WhatsApp/Google e da mensagem de WhatsApp (que passa a citar o código de

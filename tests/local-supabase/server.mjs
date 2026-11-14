@@ -251,6 +251,12 @@ globalThis.Netlify = { env: { get: k => process.env[k] } };
 const sitemapFn = (await import(path.join(ROOT, 'netlify/functions/sitemap.mjs'))).default;
 const metaFn = (await import(path.join(ROOT, 'netlify/edge-functions/imovel-meta.js'))).default;
 const dwvFn = (await import(path.join(ROOT, 'netlify/functions/dwv.mjs'))).default;
+const dwvFotoFn = (await import(path.join(ROOT, 'netlify/functions/dwv-foto.mjs'))).default;
+/* cabeçalhos do netlify.toml ([[headers]]), para testar com as mesmas regras de segurança do site publicado */
+const HEADERS = [...fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8').matchAll(/\[\[headers\]\]\s*\n\s*for = "([^"]+)"\s*\n\s*\[headers\.values\]\n((?:\s+[\w-]+ = "[^"]*"\n?)+)/g)]
+  .map(m => ({ re: new RegExp('^' + m[1].replace(/[.]/g, '\\.').replace(/\*/g, '.*') + '$'), h: Object.fromEntries([...m[2].matchAll(/([\w-]+) = "([^"]*)"/g)].map(x => [x[1], x[2]])) }));
+// no teste, o "Supabase" é local: a CSP aceita o endereço dele no lugar de *.supabase.co
+const aplicaHeaders = (p, r) => { for (const { re, h } of HEADERS) if (re.test(p)) for (const [k, v] of Object.entries(h)) r.headers.set(k, k === 'Content-Security-Policy' ? v.replace(/https:\/\/\*\.supabase\.co/g, `$& ${API}`) : v); return r; };
 const MIME = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2', '.txt': 'text/plain', '.xml': 'application/xml', '.svg': 'image/svg+xml' };
 function serveFile(file, status = 200) {
   let body = fs.readFileSync(file);
@@ -266,6 +272,7 @@ async function site(req) {
   let p = decodeURIComponent(url.pathname);
   if (p === '/sitemap.xml') return sitemapFn(req);
   if (p === '/api/dwv') return dwvFn(req);
+  if (p === '/api/dwv-foto') return dwvFotoFn(req);
   if (p === '/admin') return new Response(null, { status: 301, headers: { Location: '/admin/' } });
   if (p.startsWith('/imovel/')) return metaFn(req, { next: async () => serveFile(path.join(PUB, 'imovel', 'index.html')) });
   if (p.endsWith('/')) p += 'index.html';
@@ -276,7 +283,8 @@ async function site(req) {
 http.createServer(async (req, res) => {
   try {
     const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req) : undefined;
-    const r = await site(new Request(`http://127.0.0.1:${SITE_PORT}${req.url}`, { method: req.method, headers: req.headers, body }));
+    const r0 = await site(new Request(`http://127.0.0.1:${SITE_PORT}${req.url}`, { method: req.method, headers: req.headers, body }));
+    const r = aplicaHeaders(new URL(req.url, 'http://x').pathname, new Response(r0.body, r0));
     res.writeHead(r.status, Object.fromEntries(r.headers)); res.end(Buffer.from(await r.arrayBuffer()));
   } catch (e) { console.error(e); res.writeHead(500); res.end(String(e)); }
 }).listen(SITE_PORT, '127.0.0.1', () => console.log(`Site: http://127.0.0.1:${SITE_PORT}  (${DEMO ? 'modo demonstração' : 'Supabase local em ' + API})`));

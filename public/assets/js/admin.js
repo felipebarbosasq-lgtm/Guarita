@@ -30,6 +30,7 @@ function errMsg(e) {
   const m = (e && (e.message || e.error_description || e.msg)) || String(e);
   if (/duplicate key.*slug/i.test(m) || /imoveis_slug_key/.test(m)) return 'Já existe outro imóvel com este endereço de página. Altere o campo "Endereço da página".';
   if (/duplicate key.*codigo/i.test(m) || /imoveis_codigo_key/.test(m)) return 'Já existe outro imóvel com este código de referência.';
+  if (/origem_captacao/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem o campo "Origem do imóvel". No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-06-origem-imovel.sql (uma vez só).';
   if (/ocultar_unidade/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem a opção de ocultar o apartamento. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-05-ocultar-unidade.sql (uma vez só).';
   if (/oportunidade|valor_anterior/.test(m) && /column|schema cache|coluna/i.test(m)) return 'O banco ainda não tem os campos de Oportunidade. No Supabase, abra o SQL Editor e rode o arquivo supabase/atualizacao-02-oportunidade.sql (uma vez só).';
   if (/valor_anterior_maior/.test(m)) return 'O valor anterior ("de") precisa ser maior que o valor atual.';
@@ -183,7 +184,7 @@ async function removeImovel(im) {
 /* ---------- editor ---------- */
 const F = name => $('#f-edit').elements[name];
 const NUM = ['valor', 'valor_anterior', 'area_privativa', 'area_total'], INT = ['dormitorios', 'suites', 'banheiros', 'vagas'];
-const TXT = ['nome', 'codigo', 'tipo', 'complemento', 'endereco', 'bairro', 'cidade', 'estado', 'descricao', 'info_complementar', 'finalidade', 'status', 'slug'];
+const TXT = ['nome', 'codigo', 'tipo', 'complemento', 'endereco', 'bairro', 'cidade', 'estado', 'descricao', 'info_complementar', 'origem_captacao', 'finalidade', 'status', 'slug'];
 function showList() { $('#s-edit').hidden = true; $('#s-list').hidden = false; scrollTo(0, 0); }
 function openEditor(im) {
   const isNew = !im;
@@ -387,11 +388,11 @@ async function upload(item, file) {
   const url = p => sb.storage.from(BUCKET).getPublicUrl(p).data.publicUrl;
   Object.assign(item, { lg: url(files.lg), md: url(files.md), th: url(files.th), w: r.w, h: r.h, alt: '', files: Object.values(files), tmp: false, msg: '' });
 }
-async function addFiles(list) {
-  if (!ed) return;
+async function addFiles(list, silencioso) {
+  if (!ed) return { ok: 0, erros: [] };
   const files = [...list], errs = [];
-  if (ed.fotos.length + files.length > 60) { $('#ph-err').textContent = 'Cada imóvel aceita até 60 fotos.'; return; }
-  $('#ph-err').textContent = '';
+  if (ed.fotos.length + files.length > 60) { $('#ph-err').textContent = 'Cada imóvel aceita até 60 fotos.'; return { ok: 0, erros: ['limite de 60 fotos'] }; }
+  if (!silencioso) $('#ph-err').textContent = '';
   const items = files.map(f => ({ tmp: true, msg: 'Na fila…', preview: URL.createObjectURL(f), name: f.name }));
   ed.fotos.push(...items); ed.busy += items.length; ed.dirty = true; renderPhotos();
   let next = 0;
@@ -399,15 +400,18 @@ async function addFiles(list) {
     while (next < items.length) {
       const k = next++, it = items[k];
       it.msg = 'Otimizando…'; renderPhotos();
-      try { await upload(it, files[k]); }
+      try { await upload(it, files[k]); if (files[k].__u) (ed.dwvOk || (ed.dwvOk = new Set())).add(files[k].__u); }
       catch (e) { it.fail = true; it.msg = 'Não enviada'; errs.push(`${files[k].name}: ${e.message ? (e.message.includes('row-level') ? 'sem permissão' : e.message) : e}`); }
       finally { URL.revokeObjectURL(it.preview); delete it.preview; ed.busy--; renderPhotos(); }
     }
   };
   await Promise.all([worker(), worker()]);
   ed.fotos = ed.fotos.filter(f => !f.fail); renderPhotos();
-  if (errs.length) $('#ph-err').textContent = 'Algumas fotos não foram aceitas: ' + errs.join('; ') + '.';
-  else toast(`${items.length} ${items.length === 1 ? 'foto enviada' : 'fotos enviadas'}. Clique em Salvar para gravar o imóvel.`);
+  if (!silencioso) {
+    if (errs.length) $('#ph-err').textContent = 'Algumas fotos não foram aceitas: ' + errs.join('; ') + '.';
+    else toast(`${items.length} ${items.length === 1 ? 'foto enviada' : 'fotos enviadas'}. Clique em Salvar para gravar o imóvel.`);
+  }
+  return { ok: items.length - errs.length, erros: errs };
 }
 
 /* ---------- compartilhado com o CRM (crm.js) ---------- */
@@ -441,27 +445,44 @@ $('#b-dwv').onclick = async () => {
     F('valor').value = money(im.valor); F('area_privativa').value = dec(im.area_privativa); F('area_total').value = dec(im.area_total);
     INT.forEach(k => F(k).value = im[k] == null ? '' : im[k]);
     F('caracteristicas').value = (im.caracteristicas || []).join('\n');
+    if (!F('origem_captacao').value.trim()) F('origem_captacao').value = `Importado do DWV em ${new Date().toLocaleDateString('pt-BR')}` + (out.origem && out.origem.construtora ? ` · Construtora: ${out.origem.construtora}` : '') + ` · ${out.link}`;
     if (!ed.slugTouched || !F('slug').value) { ed.slugTouched = false; F('slug').value = autoSlug({ ...im, codigo: F('codigo').value.trim(), ocultar_unidade: !F('mostrar_unidade').checked }); }
     ed.dirty = true; preview();
-    /* fotos: baixadas direto do DWV pelo navegador e otimizadas/enviadas como num envio normal */
-    const urls = (out.fotos || []).slice(0, Math.max(0, 60 - ed.fotos.length)), files = [];
-    let feitos = 0, falhas = 0, next = 0;
-    st.textContent = `Dados preenchidos. Baixando ${urls.length} fotos do DWV…`;
-    const baixar = async () => {
-      while (next < urls.length) {
-        const k = next++;
-        try {
-          const res = await fetch(urls[k], { mode: 'cors' }); if (!res.ok) throw new Error();
-          const blob = await res.blob(); files[k] = new File([blob], urls[k].split('/').pop() || `foto-${k + 1}.jpg`, { type: blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg' });
-        } catch (_) { falhas++; }
-        st.textContent = `Dados preenchidos. Baixando fotos do DWV: ${++feitos} de ${urls.length}…`;
+    /* fotos: em lotes pequenos (pouca memória, bom para iPad). Cada foto é baixada direto do DWV;
+       se o navegador não conseguir, tenta de novo e depois pelo próprio site (/api/dwv-foto). */
+    const jaTem = ed.dwvOk || new Set(); // ao importar de novo, só busca as fotos que faltaram
+    const urls = (out.fotos || []).filter(u => !jaTem.has(u)).slice(0, Math.max(0, 60 - ed.fotos.length));
+    const token = session && session.access_token, motivos = {};
+    const comoArquivo = (blob, u, k) => Object.assign(new File([blob], u.split('/').pop() || `foto-${k + 1}.jpg`, { type: blob.type && blob.type.startsWith('image/') ? blob.type : 'image/jpeg' }), { __u: u });
+    const baixarFoto = async (u, k) => {
+      for (let t = 0; t < 2; t++) {
+        try { const r = await fetch(u, { mode: 'cors', cache: 'no-store' }); if (r.ok) { const b = await r.blob(); if (b.size > 1000) return comoArquivo(b, u, k); } } catch (_) { /* tenta de novo / alternativo */ }
       }
+      try {
+        const r = await fetch('/api/dwv-foto?u=' + encodeURIComponent(u), { headers: { Authorization: 'Bearer ' + token } });
+        if (r.ok) return comoArquivo(await r.blob(), u, k);
+        const m = (await r.text()).slice(0, 80) || ('erro ' + r.status); motivos[m] = (motivos[m] || 0) + 1;
+      } catch (e) { motivos['sem conexão'] = (motivos['sem conexão'] || 0) + 1; }
+      return null;
     };
-    await Promise.all([baixar(), baixar(), baixar(), baixar()]);
-    const ok = files.filter(Boolean);
-    if (ok.length) { st.textContent = `Otimizando e salvando ${ok.length} fotos…`; await addFiles(ok); }
-    const faltou = (out.fotos || []).length - urls.length;
-    st.textContent = `✓ Importado do DWV: ${ok.length} ${ok.length === 1 ? 'foto' : 'fotos'}${falhas ? ` (${falhas} não baixaram)` : ''}${faltou > 0 ? ` (${faltou} ficaram de fora: limite de 60 por imóvel)` : ''}. Confira os dados${im.bairro ? '' : ', preencha o bairro'}, escolha a capa e toque em Salvar. O imóvel só aparece no site quando você ligar "Publicado no site".`;
+    let feitas = 0, enviadas = 0, naoBaixadas = 0; const errosEnvio = [];
+    const LOTE = 4;
+    for (let i = 0; i < urls.length; i += LOTE) {
+      st.textContent = `Dados preenchidos. Fotos do DWV: ${feitas} de ${urls.length} prontas…`;
+      const lote = (await Promise.all(urls.slice(i, i + LOTE).map((u, j) => baixarFoto(u, i + j))));
+      naoBaixadas += lote.filter(f => !f).length;
+      const arquivos = lote.filter(Boolean);
+      if (arquivos.length) { const r = await addFiles(arquivos, true); enviadas += r.ok; errosEnvio.push(...r.erros); }
+      feitas += Math.min(LOTE, urls.length - i);
+    }
+    const faltou = (out.fotos || []).filter(u => !jaTem.has(u)).length - urls.length;
+    const probl = [];
+    if (naoBaixadas) probl.push(`${naoBaixadas} não baixaram (${Object.entries(motivos).map(([m, n]) => `${m}: ${n}`).join('; ') || 'bloqueadas pelo navegador'})`);
+    if (errosEnvio.length) probl.push(`${errosEnvio.length} não foram salvas (${errosEnvio.slice(0, 3).join('; ')}${errosEnvio.length > 3 ? '…' : ''})`);
+    if (faltou > 0) probl.push(`${faltou} ficaram de fora: limite de 60 por imóvel`);
+    $('#ph-err').textContent = probl.length ? 'Fotos do DWV: ' + probl.join(' · ') + '. Toque em "Importar do DWV" de novo para tentar só as que faltaram, ou envie essas fotos manualmente.' : '';
+    const total = (ed.dwvOk || new Set()).size;
+    st.textContent = `${total ? '✓' : '⚠'} Importado do DWV: ${total} de ${(out.fotos || []).length} fotos. Confira os dados${im.bairro ? '' : ', preencha o bairro'}, escolha a capa e toque em Salvar. O imóvel só aparece no site quando você ligar "Publicado no site".`;
     if (!im.bairro) { F('bairro').classList.add('bad'); }
   } catch (e) {
     err.textContent = e.message; st.textContent = '';

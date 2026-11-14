@@ -89,5 +89,5 @@ export function normalize(next, text = '') {
     const u = (x.startsWith('http') ? x : PHOTO_BASE + x).replace(/\?.*$/, ''), nome = u.split('/').pop();
     if (!seen.has(nome)) { seen.add(nome); fotos.push(u); } // a capa também aparece na galeria
   }
-  return { imovel: im, fotos, origem: { id: p.id, codigoDwv: p.legacyId || null } };
+  return { imovel: im, fotos, origem: { id: p.id, codigoDwv: p.legacyId || null, construtora: (p.reDeveloper && p.reDeveloper.name) || null } };
 }

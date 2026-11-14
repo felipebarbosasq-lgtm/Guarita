@@ -41,5 +41,5 @@ export async function fetchImoveis(supabaseUrl, key, query) {
   let r = await get('imoveis_site');
   if (r.status === 404) r = await get('imoveis');
   if (!r.ok) throw new Error('Supabase ' + r.status);
-  return (await r.json()).map(im => (im.ocultar_unidade ? { ...im, complemento: null } : im));
+  return (await r.json()).map(({ origem_captacao, ...im }) => (im.ocultar_unidade ? { ...im, complemento: null } : im));
 }

@@ -2,19 +2,9 @@
    Usada pelo painel /admin ("Importar do DWV"). Só responde a administradores logados:
    o token de login é conferido no Supabase (tabela admins, protegida por RLS). */
 import { findLink, extractNextData, normalize } from '../shared/dwv.mjs';
-import gen from '../shared/config.gen.mjs';
+import { isAdmin } from '../shared/admin-auth.mjs';
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
-
-async function isAdmin(req) {
-  const url = (process.env.SUPABASE_URL || gen.supabaseUrl || '').replace(/\/$/, ''), key = process.env.SUPABASE_ANON_KEY || gen.supabaseAnonKey;
-  const token = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
-  if (!url || !key || !token) return false;
-  try {
-    const r = await fetch(`${url}/rest/v1/admins?select=user_id&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${token}` } });
-    return r.ok && (await r.json()).length === 1;
-  } catch (_) { return false; }
-}
 
 export default async (req) => {
   if (req.method !== 'POST') return json(405, { erro: 'Use POST.' });
