@@ -217,14 +217,40 @@ $('#eq-list').addEventListener('change', async e => {
   try { await salvarMembro({ ...m, recebe_rodizio: e.target.checked }); m.recebe_rodizio = e.target.checked; A.toast(e.target.checked ? `${m.nome} entrou no rodízio.` : `${m.nome} saiu do rodízio.`); }
   catch (err) { e.target.checked = !e.target.checked; A.toast(err.message, true); }
 });
+let editando = null, ultimoTxt = '';
+async function api(acao, dados) {
+  const { data: { session } } = await sb.auth.getSession();
+  let r; try { r = await fetch('/api/equipe', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (session && session.access_token) }, body: JSON.stringify({ acao, ...dados }) }); }
+  catch (_) { throw new Error('Sem conexão. Verifique a internet e tente de novo.'); }
+  const out = await r.json().catch(() => ({ erro: r.status === 404 ? 'Criar acessos pelo painel só funciona no site publicado (Netlify).' : 'Resposta inválida do servidor.' }));
+  if (!r.ok) throw new Error(out.erro || 'Não foi possível concluir.');
+  return out;
+}
+function gerarSenha() {
+  const c = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', n = new Uint32Array(12); crypto.getRandomValues(n);
+  return [...n].map(x => c[x % c.length]).join('').replace(/(.{4})(?=.)/g, '$1-');
+}
+$('#eq-gerar').onclick = () => { $('#eq-senha').value = gerarSenha(); $('#eq-senha').select(); };
+function mostrarAcesso(m, senha, jaExistia) {
+  const link = location.origin + '/admin/', txt = `Olá, ${m.nome}! Seu acesso ao painel da Guarita Imobiliária:\n${link}\nE-mail: ${m.email}\nSenha: ${senha}\nNo primeiro acesso, se quiser, troque a senha em "Esqueci minha senha".`;
+  ultimoTxt = txt;
+  const fone = (m.telefone || '').replace(/\D/g, ''), box = $('#eq-ok');
+  box.innerHTML = `<b>✓ ${jaExistia ? 'Senha definida e acesso liberado' : 'Acesso criado'} para ${esc(m.nome)}.</b><br>Endereço: <code>${esc(link)}</code><br>E-mail: <code>${esc(m.email)}</code><br>Senha: <code>${esc(senha)}</code>
+    <div class="adm-row"><button type="button" class="btn line" id="eq-copiar">Copiar dados</button>${fone.length >= 10 ? `<a class="btn line" target="_blank" rel="noopener" href="https://wa.me/${fone.length <= 11 ? '55' + fone : fone}?text=${encodeURIComponent(txt)}">💬 Enviar pelo WhatsApp</a>` : ''}</div>`;
+  box.hidden = false; box.scrollIntoView({ block: 'center' });
+  $('#eq-copiar').onclick = async () => { try { await navigator.clipboard.writeText(txt); A.toast('Dados copiados.'); } catch (_) { A.toast('Não foi possível copiar; selecione o texto e copie.', true); } };
+}
 $('#eq-list').addEventListener('click', e => {
   if (!e.target.closest('[data-eq-edit]')) return;
   const m = equipe.find(x => x.user_id === e.target.closest('[data-uid]').dataset.uid);
+  editando = m; $('#eq-ok').hidden = true; $('#eq-senha').value = '';
+  $('#eq-senha-l').textContent = 'Nova senha (deixe em branco para manter a atual)'; $('#eq-senha-h').textContent = 'Preencha só se a pessoa esqueceu a senha ou precisa de uma nova.';
   $('#eq-email').value = m.email; $('#eq-email').readOnly = true; $('#eq-nome').value = m.nome || ''; $('#eq-tel').value = m.telefone || '';
   $('#eq-papel').value = m.papel || 'corretor'; $('#eq-rodizio').checked = !!m.recebe_rodizio; $('#eq-ativo').checked = m.ativo !== false;
   $('#eq-form-t').textContent = 'Editar: ' + (m.nome || m.email); $('#f-equipe').scrollIntoView({ block: 'center' }); $('#eq-nome').focus();
 });
-function limparEquipe() { $('#f-equipe').reset(); $('#eq-email').readOnly = false; $('#eq-form-t').textContent = 'Adicionar pessoa à equipe'; $('#eq-err').textContent = ''; }
+function limparEquipe() { editando = null; $('#f-equipe').reset(); $('#eq-email').readOnly = false; $('#eq-form-t').textContent = 'Adicionar pessoa à equipe'; $('#eq-err').textContent = '';
+  $('#eq-senha-l').textContent = 'Senha provisória'; $('#eq-senha-h').textContent = 'A pessoa pode trocar depois em "Esqueci minha senha". Se ela já tiver login criado no Supabase, deixe em branco.'; }
 $('#eq-limpar').onclick = limparEquipe;
 $('#eq-papel').addEventListener('change', () => { $('#eq-rodizio').checked = $('#eq-papel').value === 'corretor'; });
 $('#f-equipe').addEventListener('submit', async e => {
@@ -232,8 +258,26 @@ $('#f-equipe').addEventListener('submit', async e => {
   const m = { email: $('#eq-email').value.trim().toLowerCase(), nome: $('#eq-nome').value.trim(), telefone: $('#eq-tel').value.trim(), papel: $('#eq-papel').value, ativo: $('#eq-ativo').checked, recebe_rodizio: $('#eq-rodizio').checked };
   if (!/^\S+@\S+\.\S+$/.test(m.email)) { $('#eq-err').textContent = 'Informe o e-mail do login.'; return; }
   if (m.nome.length < 2) { $('#eq-err').textContent = 'Informe o nome.'; return; }
-  try { await salvarMembro(m); A.toast(`${m.nome} salvo na equipe.`); limparEquipe(); await carregar(); renderEquipe(); }
-  catch (err) { $('#eq-err').textContent = err.message; }
+  const senha = $('#eq-senha').value.trim();
+  if (senha && senha.length < 8) { $('#eq-err').textContent = 'A senha precisa ter pelo menos 8 caracteres.'; return; }
+  const b = $('#f-equipe button[type=submit]'); b.disabled = true; b.textContent = 'Salvando…';
+  try {
+    if (editando) {
+      await salvarMembro(m);
+      if (senha) { await api('senha', { user_id: editando.user_id, senha }); mostrarAcesso(m, senha, true); }
+      A.toast(senha ? `${m.nome}: dados e senha atualizados.` : `${m.nome} atualizado.`);
+    } else if (senha) {
+      const r = await api('criar', { ...m, senha });
+      if (r.jaExistia) A.toast(`Esse e-mail já tinha login: ${m.nome} entrou na equipe com a senha que já usava.`);
+      else mostrarAcesso(m, senha, false);
+    } else {
+      await salvarMembro(m); A.toast(`${m.nome} salvo na equipe.`);   // login já criado no Supabase
+    }
+    const box = $('#eq-ok').hidden ? null : $('#eq-ok').innerHTML;
+    limparEquipe(); await carregar(); renderEquipe();
+    if (box) { $('#eq-ok').innerHTML = box; $('#eq-ok').hidden = false; const c = $('#eq-copiar'); if (c) c.onclick = async () => { try { await navigator.clipboard.writeText(ultimoTxt); A.toast('Dados copiados.'); } catch (_) { A.toast('Não foi possível copiar; selecione o texto e copie.', true); } }; }
+  } catch (err) { $('#eq-err').textContent = /Não existe login/.test(err.message) ? 'Esse e-mail ainda não tem login. Informe uma senha provisória (ou toque em "Gerar senha") para criar o acesso.' : err.message; }
+  finally { b.disabled = false; b.textContent = 'Salvar'; }
 });
 $$('.dist-o').forEach(b => b.onclick = async () => {
   const v = b.dataset.rodizio === 'true';

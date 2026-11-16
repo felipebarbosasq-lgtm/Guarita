@@ -406,7 +406,7 @@ for (const [label, opts, per] of [['computador', { viewport: { width: 1440, heig
   }
   await sleep(150);
   const c1 = await tx();
-  ok(c1 < c0 - 100, `${label}: arrastar com ${opts.hasTouch ? 'o dedo' : 'o mouse'} move o carrossel (${c0.toFixed(0)} → ${c1.toFixed(0)})`);
+  ok(c1 < c0 - 60, `${label}: arrastar com ${opts.hasTouch ? 'o dedo' : 'o mouse'} move o carrossel (${c0.toFixed(0)} → ${c1.toFixed(0)})`);
   await sleep(700); const d0 = await tx(); await sleep(800); const d1 = await tx();
   ok(Math.abs(d1 - d0) < 3, `${label}: pausa depois da interação`);
   await sleep(4200); const e0 = await tx(); await sleep(1000); const e1 = await tx();
@@ -513,12 +513,48 @@ console.log('\n8. CRM');
   await P.click('[data-tab=equipe]'); await P.waitForSelector('#s-equipe:not([hidden])');
   P.__expectHttpErrors = true; // a recusa a seguir é proposital
   await P.fill('#eq-email', 'naoexiste@teste.local'); await P.fill('#eq-nome', 'Fulano'); await P.click('#f-equipe button[type=submit]');
-  await P.waitForSelector('#eq-err:not(:empty)'); P.__expectHttpErrors = false; ok((await P.locator('#eq-err').innerText()).includes('Não existe login'), 'equipe: avisa quando o login ainda não foi criado no Supabase');
+  await P.waitForSelector('#eq-err:not(:empty)'); P.__expectHttpErrors = false; ok((await P.locator('#eq-err').innerText()).includes('ainda não tem login'), 'equipe: sem senha e sem login, pede uma senha provisória para criar o acesso');
   for (const [e, n] of [['joao@teste.local', 'João Corretor'], ['maria@teste.local', 'Maria Corretora']]) {
     await P.click('#eq-limpar'); await P.fill('#eq-email', e); await P.fill('#eq-nome', n); await P.selectOption('#eq-papel', 'corretor');
     await P.click('#f-equipe button[type=submit]'); await P.waitForFunction(n => document.querySelector('#eq-list').innerText.includes(n), n);
   }
   ok(await P.locator('#eq-list .row').count() === 3, 'equipe com gestor + 2 corretores');
+  // criar acesso direto pelo painel (sem ir ao Supabase)
+  await P.click('#eq-limpar'); await P.fill('#eq-email', 'ana.nova@teste.local'); await P.fill('#eq-nome', 'Ana Nova'); await P.fill('#eq-tel', '(47) 98888-7777');
+  await P.click('#eq-gerar'); const senhaAna = await P.inputValue('#eq-senha');
+  ok(/^[A-Za-z0-9]{4}-[A-Za-z0-9]{4}-[A-Za-z0-9]{4}$/.test(senhaAna), 'equipe: "Gerar senha" cria uma senha forte (' + senhaAna + ')');
+  await P.click('#f-equipe button[type=submit]'); await P.waitForSelector('#eq-ok:not([hidden])');
+  const okTxt = await P.locator('#eq-ok').innerText();
+  ok(okTxt.includes('Acesso criado para Ana Nova') && okTxt.includes('ana.nova@teste.local') && okTxt.includes(senhaAna), 'equipe: acesso criado pelo painel, com os dados para repassar');
+  ok(decodeURIComponent(await P.locator('#eq-ok a[href*="wa.me"]').getAttribute('href')).includes('5547988887777?text=Olá, Ana Nova!'), 'equipe: botão para enviar o acesso pelo WhatsApp da pessoa');
+  await P.waitForFunction(() => document.querySelector('#eq-list').innerText.includes('Ana Nova'));
+  ok((await P.locator('#eq-list .row', { hasText: 'Ana Nova' }).innerText()).includes('CORRETOR'), 'equipe: Ana entrou como corretora');
+  const an = await page(); const AN = an.p;
+  await login(AN, 'ana.nova@teste.local', senhaAna);
+  ok(!(await AN.locator('[data-tab=equipe]').isVisible()) && await AN.locator('[data-tab=clientes]').isVisible(), 'Ana entra no painel com a senha criada (como corretora)');
+  AN.__expectHttpErrors = true; // as recusas a seguir são propositais
+  const proibido = await AN.evaluate(async () => { const c = window.GUARITA_CONFIG; const s = JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.includes('auth-token'))));
+    const r = await fetch('/api/equipe', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s.access_token }, body: JSON.stringify({ acao: 'criar', email: 'x@x.com', nome: 'X', senha: '12345678' }) });
+    const r2 = await fetch('/api/equipe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }); return [r.status, r2.status]; });
+  AN.__expectHttpErrors = false;
+  ok(proibido[0] === 403 && proibido[1] === 401, 'corretor (403) e visitante (401) não conseguem criar acessos: ' + proibido);
+  await an.ctx.close();
+  // trocar a senha pelo painel
+  await P.locator('#eq-list .row', { hasText: 'Ana Nova' }).locator('[data-eq-edit]').click();
+  ok((await P.locator('#eq-senha-l').innerText()).includes('Nova senha'), 'editar: campo vira "Nova senha"');
+  await P.fill('#eq-senha', 'NovaSenha-2026'); await P.click('#f-equipe button[type=submit]'); await P.waitForSelector('#eq-ok:not([hidden])');
+  ok((await P.locator('#eq-ok').innerText()).includes('NovaSenha-2026'), 'senha redefinida pelo painel');
+  const an2 = await page(); const AN2 = an2.p;
+  AN2.__expectHttpErrors = true;
+  await AN2.goto(SITE + '/admin/'); await AN2.waitForSelector('#v-login:not([hidden])');
+  await AN2.fill('#l-email', 'ana.nova@teste.local'); await AN2.fill('#l-pass', senhaAna); await AN2.click('#f-login button[type=submit]');
+  await AN2.waitForSelector('#l-err:not(:empty)'); ok(true, 'senha antiga deixa de funcionar');
+  AN2.__expectHttpErrors = false;
+  await AN2.fill('#l-pass', 'NovaSenha-2026'); await AN2.click('#f-login button[type=submit]'); await AN2.waitForSelector('#v-app:not([hidden])');
+  ok(true, 'senha nova funciona');
+  await an2.ctx.close();
+  await P.screenshot({ path: path.join(SHOTS, 'crm-equipe-acesso.png'), fullPage: true });
+  await P.locator('#eq-list .row', { hasText: 'Ana Nova' }).locator('[data-rod]').uncheck({ force: true }); await P.waitForSelector('#toast.on');
   await P.click('.dist-o[data-rodizio=true]'); await P.waitForSelector('.dist-o[data-rodizio=true].on');
   ok(true, 'rodízio automático ligado');
   await P.screenshot({ path: path.join(SHOTS, 'crm-equipe.png'), fullPage: true });

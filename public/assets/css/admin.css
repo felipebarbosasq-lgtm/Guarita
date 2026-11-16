@@ -199,3 +199,7 @@ header.adm-top{position:sticky;top:0;inset:auto;height:auto;transition:none}
 .tel-row input{flex:1}
 .tel-row .btn{flex:none;min-height:48px;padding:0 16px}
 .adm-interno .fg{margin-bottom:18px}
+.eq-ok{background:#f1f8f2;border:1px solid #9cc9a8;border-left:4px solid #2e8b57;padding:16px 18px;border-radius:2px;margin:6px 0 18px;line-height:1.6}
+.eq-ok code{font-size:15px;background:#fff;padding:2px 6px;border:1px solid #d7e7da;border-radius:2px;user-select:all}
+.eq-ok .adm-row{justify-content:flex-start;margin-top:10px}
+.eq-ok .btn{min-height:42px}

@@ -18,6 +18,7 @@ const API_PORT = +(process.env.API_PORT || 54321), SITE_PORT = +(process.env.SIT
 const API = `http://127.0.0.1:${API_PORT}`;
 const SECRET = 'guarita-teste-local-nao-usar-em-producao';
 const ANON_KEY = sign({ role: 'anon', iss: 'local' }, 10 * 365 * 86400);
+const SERVICE_KEY = sign({ role: 'service_role', iss: 'local' }, 10 * 365 * 86400); // simula a chave secreta (service_role)
 const DEMO = process.argv.includes('--demo');
 const STORE = path.join(process.env.STORE_DIR || '/tmp/guarita-storage');
 fs.mkdirSync(STORE, { recursive: true });
@@ -177,6 +178,24 @@ async function auth(req, res, url) {
     return send(res, 200, session(r.rows[0]).user);
   }
   if (ep === 'logout') return send(res, 204, null);
+  /* API de administração de logins (só com a chave secreta) */
+  if (ep.startsWith('admin/users')) {
+    if (req.headers.apikey !== SERVICE_KEY) return authErr(res, 401, 'This endpoint requires a valid service role key', 'not_admin');
+    if (req.method === 'POST' && ep === 'admin/users') {
+      if (!body.email || !body.password) return authErr(res, 422, 'email and password required', 'validation_failed');
+      if (String(body.password).length < 6) return authErr(res, 422, 'Password should be at least 6 characters', 'weak_password');
+      const ex = await pool.query('select id from auth.users where lower(email) = lower($1)', [body.email]);
+      if (ex.rows[0]) return authErr(res, 422, 'A user with this email address has already been registered', 'email_exists');
+      const r = await pool.query(`insert into auth.users (email, encrypted_password) values (lower($1), crypt($2, gen_salt('bf'))) returning id, email, created_at`, [body.email, body.password]);
+      return send(res, 200, session(r.rows[0]).user);
+    }
+    const m = ep.match(/^admin\/users\/([0-9a-f-]{36})$/);
+    if (req.method === 'PUT' && m) {
+      if (body.password) await pool.query(`update auth.users set encrypted_password = crypt($2, gen_salt('bf')) where id = $1`, [m[1], body.password]);
+      const r = await pool.query('select id, email, created_at from auth.users where id = $1', [m[1]]);
+      return r.rows[0] ? send(res, 200, session(r.rows[0]).user) : authErr(res, 404, 'User not found', 'user_not_found');
+    }
+  }
   if (ep === 'recover') return send(res, 200, {});
   return authErr(res, 404, 'endpoint não simulado: ' + ep, 'not_found');
 }
@@ -246,12 +265,14 @@ http.createServer(async (req, res) => {
 }).listen(API_PORT, '127.0.0.1');
 
 /* ---------- site estático com as regras do netlify.toml ---------- */
-process.env.SUPABASE_URL = DEMO ? '' : API; process.env.SUPABASE_ANON_KEY = DEMO ? '' : ANON_KEY; process.env.SITE_URL = `http://127.0.0.1:${SITE_PORT}`;
+process.env.SUPABASE_URL = DEMO ? '' : API; process.env.SUPABASE_ANON_KEY = DEMO ? '' : ANON_KEY;
+if (!process.env.SEM_CHAVE_SECRETA) process.env.SUPABASE_SERVICE_ROLE_KEY = SERVICE_KEY; process.env.SITE_URL = `http://127.0.0.1:${SITE_PORT}`;
 globalThis.Netlify = { env: { get: k => process.env[k] } };
 const sitemapFn = (await import(path.join(ROOT, 'netlify/functions/sitemap.mjs'))).default;
 const metaFn = (await import(path.join(ROOT, 'netlify/edge-functions/imovel-meta.js'))).default;
 const dwvFn = (await import(path.join(ROOT, 'netlify/functions/dwv.mjs'))).default;
 const dwvFotoFn = (await import(path.join(ROOT, 'netlify/functions/dwv-foto.mjs'))).default;
+const equipeFn = (await import(path.join(ROOT, 'netlify/functions/equipe.mjs'))).default;
 /* cabeçalhos do netlify.toml ([[headers]]), para testar com as mesmas regras de segurança do site publicado */
 const HEADERS = [...fs.readFileSync(path.join(ROOT, 'netlify.toml'), 'utf8').matchAll(/\[\[headers\]\]\s*\n\s*for = "([^"]+)"\s*\n\s*\[headers\.values\]\n((?:\s+[\w-]+ = "[^"]*"\n?)+)/g)]
   .map(m => ({ re: new RegExp('^' + m[1].replace(/[.]/g, '\\.').replace(/\*/g, '.*') + '$'), h: Object.fromEntries([...m[2].matchAll(/([\w-]+) = "([^"]*)"/g)].map(x => [x[1], x[2]])) }));
@@ -273,6 +294,7 @@ async function site(req) {
   if (p === '/sitemap.xml') return sitemapFn(req);
   if (p === '/api/dwv') return dwvFn(req);
   if (p === '/api/dwv-foto') return dwvFotoFn(req);
+  if (p === '/api/equipe') return equipeFn(req);
   if (p === '/admin') return new Response(null, { status: 301, headers: { Location: '/admin/' } });
   if (p.startsWith('/imovel/')) return metaFn(req, { next: async () => serveFile(path.join(PUB, 'imovel', 'index.html')) });
   if (p.endsWith('/')) p += 'index.html';

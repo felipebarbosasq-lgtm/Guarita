@@ -191,8 +191,20 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
 
 ## 4.1 CRM (abas Clientes, Equipe e Painel)
 - **Equipe:** gestores veem e fazem tudo; corretores veem **só os próprios clientes** e podem cadastrar e editar
-  imóveis (não excluir). Para incluir alguém: crie o login no Supabase (*Authentication > Users > Add user*, com
-  *Auto Confirm User*) e depois cadastre o mesmo e-mail na aba **Equipe**. Desligar "Acesso ativo" bloqueia a pessoa.
+  imóveis (não excluir). Para incluir alguém, na aba **Equipe** preencha nome, e-mail e uma senha provisória (ou
+  *Gerar senha*) e toque em *Salvar*: o login é criado na hora (função `netlify/functions/equipe.mjs`, só gestores) e
+  aparecem os dados para copiar ou enviar pelo WhatsApp. Para trocar a senha de alguém, toque em ✎ e preencha
+  *Nova senha*. Desligar "Acesso ativo" bloqueia a pessoa. Requer a chave secreta no Netlify (abaixo); sem ela, ainda
+  dá para criar o login no Supabase (*Authentication > Users > Add user*) e cadastrar o e-mail com a senha em branco.
+
+### Criar acessos pelo painel: chave secreta no Netlify (uma vez)
+1. Supabase: **Project Settings > API Keys**. Copie a chave **secret** (`sb_secret_...`) ou, na aba *Legacy API Keys*,
+   a **service_role** (clique em *Reveal*). Ela dá acesso total ao banco: **nunca** a coloque no código, no `config.js`
+   nem envie por mensagem.
+2. Netlify: **Site configuration > Environment variables > Add a variable > Add a single variable**.
+   Key: `SUPABASE_SERVICE_ROLE_KEY`; marque **Contains secret values**; em *Scopes*, deixe só **Functions**; cole a chave
+   em *Value* e toque em **Create variable**.
+3. **Deploys > Trigger deploy > Deploy site**.
 - **Clientes:** WhatsApp (e e-mail) não se repetem. Se um corretor tentar cadastrar um cliente que já é de outro, o
   cadastro é **bloqueado** e o aviso mostra quem está atendendo e desde quando. Só o gestor transfere ou exclui clientes.
 - **Etapas:** Novo contato › Em atendimento › Visita agendada › Proposta › Fechado / Perdido (com motivo), próximo

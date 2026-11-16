@@ -283,16 +283,17 @@
    </div>
    <div class="adm-box">
     <h2 id="eq-form-t">Adicionar pessoa à equipe</h2>
-    <ol class="steps">
-     <li>Crie o login da pessoa no Supabase: <b>Authentication › Users › Add user › Create new user</b> (e-mail, senha e <b>Auto Confirm User</b>).</li>
-     <li>Preencha abaixo com o <b>mesmo e-mail</b> e toque em <b>Salvar</b>. Passe o e-mail e a senha para a pessoa entrar em <b>/admin</b>.</li>
-    </ol>
+    <p class="muted adm-help" id="eq-instr">Preencha nome, e-mail e uma senha provisória (ou toque em <b>Gerar senha</b>) e toque em <b>Salvar</b>. O acesso é criado na hora; depois é só passar o e-mail e a senha para a pessoa entrar em <b>/admin</b>.</p>
+    <div class="eq-ok" id="eq-ok" role="status" hidden></div>
     <form id="f-equipe" novalidate>
      <div class="fg">
       <div class="f"><label for="eq-email">E-mail do login *</label><input id="eq-email" type="email" required maxlength="160"></div>
       <div class="f"><label for="eq-nome">Nome *</label><input id="eq-nome" required maxlength="120"></div>
       <div class="f"><label for="eq-tel">Telefone <span class="opt-hint">(opcional)</span></label><input id="eq-tel" type="tel" maxlength="30"></div>
       <div class="f"><label for="eq-papel">Papel</label><select id="eq-papel"><option value="corretor">Corretor</option><option value="gestor">Gestor</option></select></div>
+      <div class="f full"><label for="eq-senha" id="eq-senha-l">Senha provisória</label>
+       <div class="tel-row"><input id="eq-senha" type="text" autocomplete="new-password" spellcheck="false" maxlength="72" placeholder="Mínimo 8 caracteres"><button type="button" class="btn line" id="eq-gerar">Gerar senha</button></div>
+       <small class="adm-help" id="eq-senha-h">A pessoa pode trocar depois em "Esqueci minha senha". Se ela já tiver login criado no Supabase, deixe em branco.</small></div>
      </div>
      <label class="sw"><input type="checkbox" id="eq-rodizio" checked><span></span>Participa do rodízio de contatos do site</label>
      <label class="sw"><input type="checkbox" id="eq-ativo" checked><span></span>Acesso ativo</label>
