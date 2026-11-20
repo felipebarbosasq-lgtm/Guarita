@@ -201,7 +201,7 @@ let novoSlug = '';
     const opo = card.locator('.opo');
     ok(await opo.count() === 1 && (await opo.innerText()).toUpperCase().includes('OPORTUNIDADE'), 'site: cartão com a faixa "Oportunidade"');
     const st = await opo.evaluate(e => { const c = getComputedStyle(e); return [c.color, c.animationName, getComputedStyle(e.querySelector('i'), '::after').animationName]; });
-    ok(st[0] === 'rgb(13, 12, 10)' && st[1] === 'opo' && st[2] === 'opo-ping', 'site: texto preto e pulso discreto ' + st.join(' / '));
+    ok(st[0] === 'rgb(31, 24, 16)' && st[1] === 'opo' && st[2] === 'opo-ping', 'site: texto escuro (café da marca) e pulso discreto ' + st.join(' / '));
     const price = (await card.locator('.price').innerText()).replace(/\s+/g, ' ');
     ok(/De R\$ 14\.000\.000,00 Por R\$ 12\.500\.000,00/i.test(price) && await card.locator('.price s').count() === 1, 'site: "De R$ 14.000.000,00" riscado e "Por R$ 12.500.000,00": ' + price);
     ok(!(await card.innerText()).includes('1801'), 'site: cartão sem o número do apartamento oculto');

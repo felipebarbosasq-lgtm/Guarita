@@ -501,3 +501,48 @@ nav .btn.pill{min-height:46px;padding:0 20px;font-size:14px}
 }
 /* com o menu do celular aberto, o desfoque do topo sairia do lugar e prenderia o menu dentro da barra */
 header.menu-open{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:rgb(251,249,245)!important}
+
+/* ===== CORES DA MARCA (tiradas da logo): dourado metálico + branco, com marrom-café no lugar do preto ===== */
+:root{
+ --gold:#b8892b;--gold2:#d3aa50;--gold-d:#8c661a;
+ --brand:linear-gradient(135deg,#c79d45 0%,#a97f26 48%,#8c661a 100%);   /* o dourado metálico da logo */
+ --brand-h:linear-gradient(135deg,#d3aa50 0%,#b8892b 48%,#97701f 100%);
+ --ink:#1f1810;--ink2:#2a2116;--text:#2b2218;--muted:#74685a;
+ --paper:#f9f5ee;--paper2:#fffdf8;--soft:#f4ecdc;--sand:#efe4cf;--line:#e7dcc8;
+}
+::selection{background:rgba(184,137,43,.28)}
+/* botões dourados: dourado da logo com texto branco, como as linhas brancas da logo */
+.btn.gold,.btn.pill.gold{background:var(--brand);border-color:transparent;color:#fff;text-shadow:0 1px 1px rgba(60,40,5,.25)}
+.btn.gold:hover,.btn.pill.gold:hover{background:var(--brand-h);border-color:transparent;color:#fff;box-shadow:0 12px 26px -12px rgba(140,102,26,.8)}
+.btn{background:var(--ink);border-color:var(--ink)}
+.btn:hover{background:var(--gold-d);border-color:var(--gold-d)}
+.btn.line,.btn.light,.btn.white{background:transparent}
+.btn.white{background:#fff;border-color:#fff;color:var(--ink)}
+.btn.white:hover{background:var(--soft);border-color:var(--soft);color:var(--gold-d)}
+.btn.line:hover{border-color:var(--gold);color:var(--gold-d);background:rgba(184,137,43,.06)}
+.tbusca button{background:var(--brand);color:#fff}
+.tbusca button:hover{background:var(--brand-h)}
+nav a:not(.btn){color:var(--text)}
+nav a:not(.btn):hover{color:var(--gold-d)}
+nav a:not(.btn)::after{background:var(--gold)}
+.eyebrow{color:var(--gold-d)}
+/* seleção ativa (Todos/Comprar/Alugar, opções do formulário) */
+.busca-fin button[aria-pressed=true],.chip input:checked+span{background:var(--brand);border-color:transparent;color:#fff}
+.chk input{accent-color:var(--gold)}
+.tab[aria-selected=true]{color:var(--gold-d)}
+/* selos */
+.prop .st-badge{background:var(--brand);color:#fff}
+.opo{background:linear-gradient(90deg,#b8892b,#d3aa50 50%,#b8892b);color:var(--ink)}
+.opo i,.opo i::after{background:var(--ink)}
+/* setas do carrossel */
+.car-ui button:hover{border-color:var(--gold);background:var(--gold);color:#fff}
+/* seções escuras e rodapé em marrom-café com filete dourado */
+#guarita{background:var(--ink)}
+footer{background:var(--ink);border-top:2px solid var(--gold)}
+.lang summary:hover{border-color:var(--gold)}
+/* botão flutuante do WhatsApp no dourado da marca */
+.wa{background:var(--brand);box-shadow:0 14px 30px -10px rgba(140,102,26,.7)}
+.wa:hover{background:var(--brand-h)}
+/* botão de envio dos formulários de atendimento também no dourado */
+form.lead button[type=submit].btn,.done .btn:not(.line){background:var(--brand);border-color:transparent;color:#fff}
+form.lead button[type=submit].btn:hover,.done .btn:not(.line):hover{background:var(--brand-h)}

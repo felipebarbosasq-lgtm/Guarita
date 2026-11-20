@@ -226,3 +226,14 @@ header.adm-top{background:rgba(255,255,255,.88);-webkit-backdrop-filter:saturate
 .toast{border-radius:999px;padding:14px 26px}
 .tbl-wrap{border-radius:14px;overflow:auto}
 #cl-titulo,#e-title{text-transform:none;letter-spacing:.02em}
+
+/* ===== CORES DA MARCA (iguais às do site) ===== */
+.adm .btn:not(.line):not(.danger):not(.light):not(.white){background:var(--brand);border-color:transparent;color:#fff}
+.adm .btn:not(.line):not(.danger):not(.light):not(.white):hover{background:var(--brand-h)}
+.pill[aria-pressed=true],.et-chip.on{background:var(--brand);border-color:transparent;color:#fff}
+.sw input:checked+span{background:var(--gold)}
+.crm-chk input,.imv input{accent-color:var(--gold)}
+.eq-av{background:var(--brand);color:#fff}
+.adm-tabs button[aria-current]{color:var(--gold-d);box-shadow:inset 0 0 0 1px rgba(184,137,43,.55)}
+.adm-brand span{color:var(--gold-d)}
+.toast{background:var(--ink)}
