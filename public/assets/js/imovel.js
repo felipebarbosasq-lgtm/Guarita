@@ -1,7 +1,7 @@
 /* Guarita Imobiliária: página individual do imóvel, gerada a partir do cadastro (sem editar HTML). */
 (function () {
 'use strict';
-const G = window.Guarita, { $, $$, esc, src, fmt, wa, CONFIG } = G;
+const G = window.Guarita, { $, $$, esc, src, fmt, wa, CONFIG, T } = G;
 G.chrome();
 
 /* /imovel/<slug> (Netlify) ou imovel/index.html?i=<slug> (visualização local) */
@@ -16,7 +16,7 @@ const n = v => v === null || v === undefined || v === '' ? null : Number(v);
 const text = s => esc(s).split(/\n{2,}/).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
 
 function waMsg(im) {
-  return `Olá, Guarita Imobiliária! Gostaria de receber mais informações sobre o imóvel ${fmt.title(im)}` + (im.codigo ? `, referência ${im.codigo}.` : '.');
+  return `Olá, Guarita Imobiliária! Gostaria de receber mais informações sobre o imóvel ${[im.nome, [im.tipo, im.complemento].filter(Boolean).join(' ').toLowerCase()].filter(Boolean).join(', ')}` + (im.codigo ? `, referência ${im.codigo}.` : '.');
 }
 
 function render(im) {
@@ -41,19 +41,19 @@ function render(im) {
   $('#im-unit').textContent = fmt.unit(im);
   $('#im-preco').innerHTML = fmt.priceHTML(im); $('#im-preco').classList.toggle('deal', !!fmt.oldPrice(im));
   if (im.oportunidade) $('#im-opo').hidden = false;
-  $('#im-ref').textContent = im.codigo ? `Referência ${im.codigo}` : '';
+  $('#im-ref').textContent = im.codigo ? T('Referência {c}', { c: im.codigo }) : '';
   const st = fmt.status(im); if (st) { $('#im-status').textContent = st; $('#im-status').hidden = false; }
   const link = wa(waMsg(im));
   $('#im-wa').href = link; $('#lb-wa').href = link;
 
   /* informações técnicas: só aparecem as que foram preenchidas */
   const rows = [
-    ['Tipo', im.tipo], ['Finalidade', im.finalidade === 'locacao' ? 'Locação' : 'Venda'],
+    ['Tipo', T(im.tipo)], ['Finalidade', T(im.finalidade === 'locacao' ? 'Locação' : 'Venda')],
     ['Dormitórios', n(im.dormitorios)], ['Suítes', n(im.suites)], ['Banheiros', n(im.banheiros)], ['Vagas', n(im.vagas)],
     ['Área privativa', n(im.area_privativa) ? fmt.area(n(im.area_privativa)) : null], ['Área total', n(im.area_total) ? fmt.area(n(im.area_total)) : null],
     ['Referência', im.codigo]
   ].filter(r => r[1] !== null && r[1] !== undefined && r[1] !== '');
-  $('#im-specs').innerHTML = rows.map(([k, v]) => `<li><span>${k}</span><b>${esc(v)}</b></li>`).join('');
+  $('#im-specs').innerHTML = rows.map(([k, v]) => `<li><span>${T(k)}</span><b>${esc(v)}</b></li>`).join('');
 
   if (im.descricao) { $('#im-desc').innerHTML = text(im.descricao); $('#im-desc-sec').hidden = false; }
   const feats = (im.caracteristicas || []).filter(Boolean);
@@ -67,12 +67,12 @@ function render(im) {
   const gal = $('#gal');
   if (!fotos.length) gal.hidden = true;
   else {
-    const alt = (f, k) => f.alt || `${title}: foto ${k + 1} de ${fotos.length}`;
+    const alt = (f, k) => f.alt || `${title}: ${T('foto {a} de {b}', { a: k + 1, b: fotos.length })}`;
     const side = fotos.slice(1, 5);
     gal.className = 'gal n' + Math.min(fotos.length, 5);
-    gal.innerHTML = `<button type="button" class="g0" data-i="0" aria-label="Abrir galeria: foto 1 de ${fotos.length}"><img src="${esc(src(fotos[0].lg))}" srcset="${esc(src(fotos[0].md || fotos[0].lg))} 720w, ${esc(src(fotos[0].lg))} 1280w" sizes="(max-width:860px) 100vw, 760px" alt="${esc(alt(fotos[0], 0))}" width="${fotos[0].w || 1280}" height="${fotos[0].h || 853}" fetchpriority="high">${im.oportunidade ? '<span class="opo" aria-hidden="true"><i></i>Oportunidade</span>' : ''}</button>`
-      + side.map((f, k) => `<button type="button" data-i="${k + 1}" aria-label="Abrir galeria: foto ${k + 2} de ${fotos.length}"><img src="${esc(src(f.md || f.lg))}" alt="${esc(alt(f, k + 1))}" width="${f.w || 1280}" height="${f.h || 853}" loading="lazy" decoding="async"></button>`).join('')
-      + (fotos.length > 1 ? `<button type="button" class="g-all" data-i="0">Ver as ${fotos.length} fotos</button>` : '');
+    gal.innerHTML = `<button type="button" class="g0" data-i="0" aria-label="${T('Abrir galeria')}: ${T('foto {a} de {b}', { a: 1, b: fotos.length })}"><img src="${esc(src(fotos[0].lg))}" srcset="${esc(src(fotos[0].md || fotos[0].lg))} 720w, ${esc(src(fotos[0].lg))} 1280w" sizes="(max-width:860px) 100vw, 760px" alt="${esc(alt(fotos[0], 0))}" width="${fotos[0].w || 1280}" height="${fotos[0].h || 853}" fetchpriority="high">${im.oportunidade ? '<span class="opo" aria-hidden="true"><i></i>' + T('Oportunidade') + '</span>' : ''}</button>`
+      + side.map((f, k) => `<button type="button" data-i="${k + 1}" aria-label="${T('Abrir galeria')}: ${T('foto {a} de {b}', { a: k + 2, b: fotos.length })}"><img src="${esc(src(f.md || f.lg))}" alt="${esc(alt(f, k + 1))}" width="${f.w || 1280}" height="${f.h || 853}" loading="lazy" decoding="async"></button>`).join('')
+      + (fotos.length > 1 ? `<button type="button" class="g-all" data-i="0">${T('Ver as {n} fotos', { n: fotos.length })}</button>` : '');
     gal.addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) openLB(+b.dataset.i); });
   }
   gallery(im, fotos, title);
@@ -86,14 +86,14 @@ function gallery(im, fotos, title) {
   const G2 = fotos.map(f => ({ big: src(f.lg), th: src(f.th || f.md) }));
   $('#lb-t').textContent = title; $('#lb-p').textContent = fmt.price(im);
   function view(k) {
-    gi = (k + G2.length) % G2.length; li.src = G2[gi].big; li.alt = `${title}, foto ${gi + 1} de ${G2.length}`; $('#ln').textContent = `${gi + 1} / ${G2.length}`;
+    gi = (k + G2.length) % G2.length; li.src = G2[gi].big; li.alt = `${title}, ${T('foto {a} de {b}', { a: gi + 1, b: G2.length })}`; $('#ln').textContent = `${gi + 1} / ${G2.length}`;
     [...tb.children].forEach((b, j) => b.classList.toggle('on', j === gi)); tb.children[gi].scrollIntoView({ inline: 'center', block: 'nearest' });
     [1, -1].forEach(d => { const p = G2[(gi + d + G2.length) % G2.length]; if (p) new Image().src = p.big; });
   }
   openLB = k => {
     if (!G2.length) return;
     last = document.activeElement;
-    if (!tb.children.length) tb.innerHTML = G2.map((g, j) => `<button type="button" data-i="${j}" aria-label="Foto ${j + 1}"><img src="${esc(g.th)}" alt="" width="200" height="133" loading="lazy"></button>`).join('');
+    if (!tb.children.length) tb.innerHTML = G2.map((g, j) => `<button type="button" data-i="${j}" aria-label="${T('Foto')} ${j + 1}"><img src="${esc(g.th)}" alt="" width="200" height="133" loading="lazy"></button>`).join('');
     lb.hidden = false; lb.classList.add('on'); document.body.style.overflow = 'hidden'; view(k); $('#lx').focus();
   };
   function close() { lb.classList.remove('on'); lb.hidden = true; document.body.style.overflow = ''; last && last.focus(); }
@@ -110,9 +110,9 @@ function gallery(im, fotos, title) {
 }
 
 function notFound() {
-  document.title = 'Imóvel não encontrado | Guarita Imobiliária';
+  document.title = T('Imóvel não encontrado') + ' | Guarita Imobiliária';
   setMeta('meta[name="robots"]', 'content', 'noindex');
-  $('#im-crumb').textContent = 'Não encontrado';
+  $('#im-crumb').textContent = T('Não encontrado');
   $('#im-loading').hidden = true; $('#im-404').hidden = false;
 }
 
@@ -120,7 +120,7 @@ function notFound() {
   const s = slug();
   if (!s) return notFound();
   try { const im = await G.data.get(s); im ? render(im) : notFound(); }
-  catch (e) { console.warn(e); $('#im-loading').textContent = 'Não foi possível carregar o imóvel agora. Tente novamente em instantes ou fale com a Guarita pelo WhatsApp.'; }
+  catch (e) { console.warn(e); $('#im-loading').textContent = T('Não foi possível carregar o imóvel agora. Tente novamente em instantes ou fale com a Guarita pelo WhatsApp.'); }
   G.reveal();
 })();
 })();

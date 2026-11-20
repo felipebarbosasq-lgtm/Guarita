@@ -144,12 +144,20 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
 - O banco e as fotos ficam no Supabase e **não** são afetados por novas publicações.
 
 ## 3.8 Busca e regiões no site
-- **Lupa:** ícone no topo (em todas as páginas) e barra de busca na seção de imóveis: *Todos / Comprar / Alugar* e região
+- **Busca no topo:** barra em pílula no topo de todas as páginas; procura por nome, bairro, cidade, endereço, tipo,
+  referência e descrição (`/?q=frente mar` abre já filtrado).
+- **Busca da seção de imóveis:** *Todos / Comprar / Alugar* e região
   (Balneário Camboriú, Itapema, Porto Belo, Itajaí, Praia Brava, Flórida/EUA). Sem resultados, oferece falar com um
   especialista pelo WhatsApp já com o pedido. Links como `/?regiao=itapema&finalidade=venda` abrem a busca filtrada.
   Imóveis da Flórida: cadastre com estado **FL** (ou cidade Miami, Orlando, etc.).
 - **Áreas de atuação:** cartões em carrossel automático, em ordem aleatória a cada visita, que também deslizam com o dedo,
   incluindo **Flórida, Estados Unidos** (foto: skyline de Miami, Wilfredor, Wikimedia Commons, domínio público CC0).
+
+## 3.9 Idiomas (Português, English, Español)
+O seletor de bandeiras no topo troca o idioma do site (a escolha fica lembrada no aparelho; `?lang=en` ou `?lang=es`
+no endereço também funciona). Traduz menus, botões, textos fixos e as frases montadas pelo site (cartões, busca,
+página do imóvel). Os dados cadastrados no painel (nome, descrição, bairro…) aparecem como foram escritos, e as
+mensagens que chegam no WhatsApp da Guarita continuam em português. Traduções ficam em `public/assets/js/i18n.js`.
 
 ## 4. Painel administrativo (`/admin/`)
 - Login com e-mail e senha individuais; "Esqueci minha senha" envia um link de redefinição.
@@ -229,8 +237,9 @@ Quem instala do zero só precisa do `schema.sql` (já inclui todas as atualizaç
 - Nenhuma senha ou chave privada fica no código. `.env` está no `.gitignore`.
 
 ## 6. Banner e créditos das fotografias
-O banner tem 3 fotos de Balneário Camboriú enviadas pela Guarita (Barra Sul e marina, Praia Central com a
-roda-gigante e entardecer na Barra Sul). Os originais tinham entre 720 e 1200 px; foram ampliados 4 vezes com
+A abertura mostra **uma única foto de capa**, escolhida em `CAPA` no `tools/hero_images.py` (hoje: Praia Central com a
+roda-gigante). Há 3 fotos de Balneário Camboriú enviadas pela Guarita já prontas (Barra Sul e marina, Praia Central e
+entardecer na Barra Sul); para trocar a capa entre elas, mude `CAPA` e rode `python3 tools/hero_images.py --capa`. Os originais tinham entre 720 e 1200 px; foram ampliados 4 vezes com
 inteligência artificial (Real-ESRGAN, `tools/ampliar_fotos.py`) e misturados a 20% de uma ampliação tradicional
 para manter a textura natural. Depois, `tools/hero_images.py` cria versões de 1280 a 3840 px para computador e um
 recorte vertical (9:16) para celular, sem bordas pretas e sem deformar.
@@ -243,7 +252,7 @@ Para trocar as fotos: amplie com `tools/ampliar_fotos.py` (instruções no iníc
 `python3 tools/hero_images.py PASTA`. O script atualiza o HTML e os créditos.
 
 Fotos das regiões: Wikimedia Commons (créditos no rodapé). Fotos do Eleganza Tower, roda-gigante e fundador: acervo da Guarita.
-Fontes: Cormorant Garamond e Jost, SIL Open Font License 1.1 (arquivos em `public/assets/fonts`).
+Fontes: Cormorant Garamond, Jost e Oswald, SIL Open Font License 1.1 (arquivos em `public/assets/fonts`).
 
 ## 7. Formulários de atendimento
 Abas **Comprar | Alugar | Anunciar meu imóvel**. Cada uma valida os dados e abre a conversa no WhatsApp da Guarita

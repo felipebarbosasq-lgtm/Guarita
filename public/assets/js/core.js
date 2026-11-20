@@ -6,6 +6,8 @@ const $ = (s, c = document) => c.querySelector(s), $$ = (s, c = document) => [..
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wa = t => `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(t)}`;
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* idioma escolhido (i18n.js); sem ele, tudo em português */
+const T = (x, v) => (window.I18N ? window.I18N.t(x, v) : x);
 const hasDB = !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
 
 /* raiz do site, descoberta pelo endereço deste próprio arquivo (funciona no servidor e aberto do disco).
@@ -19,31 +21,32 @@ const imovelUrl = im => CONFIG.prettyUrls && location.protocol !== 'file:'
 const nf = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 });
 const brl = v => 'R$ ' + new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
 const n = v => v === null || v === undefined || v === '' ? null : Number(v);
-const plural = (q, um, varios) => `${q} ${q === 1 ? um : varios}`;
+const plural = (q, um, varios) => `${q} ${T(q === 1 ? um : varios)}`;
 const STATUS = { disponivel: '', reservado: 'Reservado', vendido: 'Vendido', alugado: 'Alugado' };
+const tipo = im => T(im.tipo);
 const fmt = {
-  price(im) { const v = n(im.valor); return v ? brl(v) + (im.finalidade === 'locacao' ? '/mês' : '') : 'Sob consulta'; },
-  priceLabel(im) { return im.finalidade === 'locacao' ? 'Aluguel' : 'Valor'; },
+  price(im) { const v = n(im.valor); return v ? brl(v) + (im.finalidade === 'locacao' ? T('/mês') : '') : T('Sob consulta'); },
+  priceLabel(im) { return T(im.finalidade === 'locacao' ? 'Aluguel' : 'Valor'); },
   /* preço "de": só aparece quando é maior que o preço atual */
-  oldPrice(im) { const a = n(im.valor_anterior), v = n(im.valor); return a && v && a > v ? brl(a) + (im.finalidade === 'locacao' ? '/mês' : '') : ''; },
+  oldPrice(im) { const a = n(im.valor_anterior), v = n(im.valor); return a && v && a > v ? brl(a) + (im.finalidade === 'locacao' ? T('/mês') : '') : ''; },
   /* bloco de preço padronizado: "Valor R$ X" ou "De R$ X / Por R$ Y" */
   priceHTML(im) {
     const old = fmt.oldPrice(im);
     if (!old) return `<small>${fmt.priceLabel(im)}</small>${esc(fmt.price(im))}`;
-    return `<small class="de">De <s>${esc(old)}</s></small><span class="por"><small>Por</small> ${esc(fmt.price(im))}</span>`;
+    return `<small class="de">${T('De')} <s>${esc(old)}</s></small><span class="por"><small>${T('Por')}</small> ${esc(fmt.price(im))}</span>`;
   },
   area(v) { return nf.format(v) + ' m²'; },
   loc(im) { return [im.bairro, im.cidade].filter(Boolean).join(' · '); },
-  unit(im) { return [[im.tipo, im.complemento].filter(Boolean).join(' '), im.endereco].filter(Boolean).join(' · '); },
-  title(im) { return [im.nome, [im.tipo, im.complemento].filter(Boolean).join(' ').toLowerCase()].filter(Boolean).join(', '); },
-  status(im) { return STATUS[im.status] || ''; },
+  unit(im) { return [[tipo(im), im.complemento].filter(Boolean).join(' '), im.endereco].filter(Boolean).join(' · '); },
+  title(im) { return [im.nome, [tipo(im), im.complemento].filter(Boolean).join(' ').toLowerCase()].filter(Boolean).join(', '); },
+  status(im) { return T(STATUS[im.status] || ''); },
   /* linha de características do cartão: "4 dormitórios, 2 suítes · 3 vagas · 140 m² privativos" */
   specs(im) {
     const out = [], d = n(im.dormitorios), s = n(im.suites), g = n(im.vagas), a = n(im.area_privativa);
-    if (d) out.push(`<li><b>${d}</b> ${d === 1 ? 'dormitório' : 'dormitórios'}${s ? ', ' + plural(s, 'suíte', 'suítes') : ''}</li>`);
-    else if (s) out.push(`<li><b>${s}</b> ${s === 1 ? 'suíte' : 'suítes'}</li>`);
-    if (g) out.push(`<li><b>${g}</b> ${g === 1 ? 'vaga' : 'vagas'}</li>`);
-    if (a) out.push(`<li><b>${fmt.area(a)}</b> privativos</li>`);
+    if (d) out.push(`<li><b>${d}</b> ${T(d === 1 ? 'dormitório' : 'dormitórios')}${s ? ', ' + plural(s, 'suíte', 'suítes') : ''}</li>`);
+    else if (s) out.push(`<li><b>${s}</b> ${T(s === 1 ? 'suíte' : 'suítes')}</li>`);
+    if (g) out.push(`<li><b>${g}</b> ${T(g === 1 ? 'vaga' : 'vagas')}</li>`);
+    if (a) out.push(`<li><b>${fmt.area(a)}</b> ${T('privativos')}</li>`);
     return out.join('');
   }
 };
@@ -51,18 +54,18 @@ const fmt = {
 /* cartão do imóvel: mesmo HTML para os imóveis originais e os cadastrados no painel */
 function card(im) {
   const f = (im.fotos || [])[0], url = imovelUrl(im), total = (im.fotos || []).length, st = fmt.status(im);
-  const alt = (f && f.alt) || `${fmt.title(im)}: foto principal`;
+  const alt = (f && f.alt) || `${fmt.title(im)}: ${T('foto principal')}`;
   const img = f ? `<img src="${esc(src(f.md || f.lg))}" srcset="${esc(src(f.md || f.lg))} 720w, ${esc(src(f.lg || f.md))} 1280w" sizes="(max-width:640px) 88vw, (max-width:1080px) 46vw, 390px" alt="${esc(alt)}" width="${f.w || 1280}" height="${f.h || 853}" loading="lazy" decoding="async" draggable="false">` : '';
   return `<article class="prop${im.oportunidade ? ' is-opo' : ''}" data-id="${esc(im.id)}">
-    <a class="ph" href="${esc(url)}" tabindex="-1" aria-hidden="true" draggable="false">${img}${total > 1 ? `<span class="tag">${total} fotos</span>` : ''}${st ? `<span class="st-badge">${st}</span>` : ''}${im.oportunidade ? '<span class="opo"><i aria-hidden="true"></i>Oportunidade</span>' : ''}</a>
+    <a class="ph" href="${esc(url)}" tabindex="-1" aria-hidden="true" draggable="false">${img}${total > 1 ? `<span class="tag">${T('{n} fotos', { n: total })}</span>` : ''}${st ? `<span class="st-badge">${st}</span>` : ''}${im.oportunidade ? '<span class="opo"><i aria-hidden="true"></i>' + T('Oportunidade') + '</span>' : ''}</a>
     <div class="bd">
-     <span class="loc">${im.oportunidade ? '<span class="sr">Oportunidade. </span>' : ''}${esc(fmt.loc(im))}</span>
+     <span class="loc">${im.oportunidade ? '<span class="sr">' + T('Oportunidade') + '. </span>' : ''}${esc(fmt.loc(im))}</span>
      <h3>${esc(im.nome)}</h3>
      <p class="unit">${esc(fmt.unit(im))}</p>
-     <ul class="specs" aria-label="Características">${fmt.specs(im)}</ul>
+     <ul class="specs" aria-label="${T('Características')}">${fmt.specs(im)}</ul>
      <div class="ft">
       <p class="price${fmt.oldPrice(im) ? ' deal' : ''}">${fmt.priceHTML(im)}</p>
-      <a class="btn" href="${esc(url)}" draggable="false" aria-label="Ver imóvel: ${esc(fmt.title(im))}">Ver imóvel</a>
+      <a class="btn" href="${esc(url)}" draggable="false" aria-label="${T('Ver imóvel')}: ${esc(fmt.title(im))}">${T('Ver imóvel')}</a>
      </div>
     </div>
    </article>`;
@@ -108,7 +111,7 @@ function chrome() {
   const hd = $('#hd'), nv = $('#nv'), bg = $('#bg'), fab = $('.wa'), solid = hd && hd.classList.contains('solid'); let tk = false;
   function onScroll() { const y = scrollY; hd.classList.toggle('s', solid || y > 40); if (fab) fab.classList.toggle('on', y > innerHeight * .6 || solid); tk = false; }
   addEventListener('scroll', () => { if (!tk) { tk = true; requestAnimationFrame(onScroll); } }, { passive: true }); onScroll();
-  function menu(o) { nv.classList.toggle('open', o); bg.setAttribute('aria-expanded', o); bg.setAttribute('aria-label', o ? 'Fechar menu' : 'Abrir menu'); document.body.style.overflow = o ? 'hidden' : ''; }
+  function menu(o) { nv.classList.toggle('open', o); hd.classList.toggle('menu-open', o); bg.setAttribute('aria-expanded', o); bg.setAttribute('aria-label', T(o ? 'Fechar menu' : 'Abrir menu')); document.body.style.overflow = o ? 'hidden' : ''; }
   bg.onclick = () => menu(!nv.classList.contains('open'));
   $$('#nv a').forEach(a => a.addEventListener('click', () => menu(false)));
   addEventListener('keydown', e => { if (e.key === 'Escape' && nv.classList.contains('open')) { menu(false); bg.focus(); } });
@@ -124,5 +127,5 @@ function reveal(root = document) {
   setTimeout(() => els.forEach(e => { const r = e.getBoundingClientRect(); if (r.top < innerHeight && r.bottom > 0) e.classList.add('in'); }), 400);
 }
 
-window.Guarita = { semUnidade, CONFIG, $, $$, reduce, wa, esc, src, imovelUrl, fmt, card, data, chrome, reveal };
+window.Guarita = { T, semUnidade, CONFIG, $, $$, reduce, wa, esc, src, imovelUrl, fmt, card, data, chrome, reveal };
 })();

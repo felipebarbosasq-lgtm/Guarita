@@ -408,3 +408,96 @@ header nav{margin-left:8px}
  .js .rv{opacity:1;transform:none}
  .slide img{transform:none}
 }
+
+/* =====================================================================
+   VISUAL MINIMALISTA (2026): barra clara com busca em pílula, idiomas,
+   capa única em quadro arredondado, títulos em Oswald e botões em pílula.
+   Os cartões de imóveis mantêm o estilo anterior.
+   ===================================================================== */
+@font-face{font-family:'Oswald';font-style:normal;font-weight:300;font-display:swap;src:url(../fonts/oswald-latin-300-normal.woff2) format('woff2')}
+@font-face{font-family:'Oswald';font-style:normal;font-weight:400;font-display:swap;src:url(../fonts/oswald-latin-400-normal.woff2) format('woff2')}
+:root{--display:'Oswald','Jost',system-ui,sans-serif;--hd:88px;--hds:72px;--edge:clamp(12px,3.2vw,56px);--soft:#f3eee5}
+html{scroll-padding-top:calc(var(--hds) + 12px)}
+
+/* barra do topo */
+header{height:var(--hd);background:rgba(251,249,245,.94);-webkit-backdrop-filter:saturate(1.3) blur(14px);backdrop-filter:saturate(1.3) blur(14px);box-shadow:0 1px 0 rgba(13,12,10,.06)}
+header.s{height:var(--hds);background:rgba(251,249,245,.97);box-shadow:0 12px 30px -26px rgba(13,12,10,.4)}
+header .wrap{width:min(1320px,100% - 2*var(--edge));justify-content:flex-start;gap:clamp(12px,1.6vw,22px)}
+.logo img{height:58px}header.s .logo img{height:48px}
+header nav{margin-left:auto;gap:clamp(16px,1.9vw,28px)}
+nav a:not(.btn){color:#2a261f;font-size:14.5px;letter-spacing:.02em}
+nav a:not(.btn):hover{color:var(--gold)}
+.lupa{display:none}
+.tbusca{flex:0 1 340px;display:flex;align-items:center;height:52px;padding:0 6px 0 20px;background:var(--soft);border:1px solid transparent;border-radius:999px;box-shadow:0 10px 26px -14px rgba(40,28,8,.28);transition:border-color .3s,box-shadow .3s,background .3s}
+.tbusca:focus-within{border-color:rgba(181,138,60,.55);background:#fff;box-shadow:0 0 0 4px rgba(181,138,60,.12)}
+.tbusca input{flex:1;min-width:0;height:100%;border:0;background:none;font:400 15px var(--sans);color:var(--text);outline:0}
+.tbusca input::placeholder{color:#8a8173}
+.tbusca input::-webkit-search-cancel-button{-webkit-appearance:none}
+.tbusca button{flex:none;width:40px;height:40px;border:0;border-radius:50%;background:var(--gold);color:#140f06;display:grid;place-items:center;cursor:pointer;transition:background .3s,transform .3s}
+.tbusca button:hover{background:var(--gold2);transform:scale(1.05)}
+.tbusca svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.burger i{background:var(--ink)}
+
+/* botões em pílula */
+.btn{border-radius:999px;font-weight:400;letter-spacing:.03em}
+.btn.pill{min-height:50px;padding:0 26px;gap:10px;font-weight:500;letter-spacing:.02em}
+.btn .ic-wa{width:18px;height:18px;fill:currentColor;flex:none}
+.btn .ic{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.5;flex:none}
+.btn.gold:hover{box-shadow:0 12px 26px -14px rgba(181,138,60,.85);transform:translateY(-1px)}
+.btn.white{background:#fff;border-color:#fff;color:var(--ink)}
+.btn.white:hover{background:var(--soft);border-color:var(--soft)}
+nav .btn.pill{min-height:46px;padding:0 20px;font-size:14px}
+.prop .btn,.car-ui button:not(.car-pp){border-radius:2px}   /* cartões de imóveis: estilo original */
+.car-ui button:not(.car-pp){border-radius:50%}
+.chip span{border-radius:999px;padding:0 20px}
+.f input[type=text],.f input[type=tel],.f select{border-radius:12px}
+.busca{border-radius:18px}
+.busca-fin{border-radius:999px}
+.busca select{border-radius:999px}
+
+/* idiomas */
+.lang{position:relative;flex:none}
+.lang summary{list-style:none;display:flex;align-items:center;gap:8px;min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font:500 13px var(--sans);letter-spacing:.06em;color:#2a261f;background:#fff;user-select:none}
+.lang summary::-webkit-details-marker{display:none}
+.lang-cur{display:flex;align-items:center;gap:7px}
+.flag{width:20px;height:14px;border-radius:2px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.06)}
+.lang .chev{width:10px;height:7px;fill:none;stroke:currentColor;stroke-width:1.6;transition:transform .3s}
+.lang[open] .chev{transform:rotate(180deg)}
+.lang-m{position:absolute;right:0;top:calc(100% + 8px);min-width:170px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 22px 40px -22px rgba(40,28,8,.45);display:grid;gap:2px;z-index:5}
+.lang-m button{display:flex;align-items:center;gap:10px;width:100%;min-height:42px;padding:0 12px;border:0;background:none;border-radius:10px;font:400 14.5px var(--sans);color:#2a261f;cursor:pointer;text-align:left}
+.lang-m button:hover,.lang-m button[aria-current=true]{background:var(--soft)}
+
+/* capa única em quadro arredondado */
+.hero{margin:calc(var(--hd) + 14px) var(--edge) 0;height:clamp(520px,calc(100svh - var(--hd) - 40px),800px);min-height:0;max-height:none;border-radius:22px;justify-content:center;text-align:center;isolation:isolate;background:#1b1a17}
+.hero::after{background:linear-gradient(180deg,rgba(10,9,7,.42) 0%,rgba(10,9,7,.18) 38%,rgba(10,9,7,.28) 62%,rgba(10,9,7,.6) 100%)}
+.hero .wrap{padding-top:0;display:flex;flex-direction:column;align-items:center}
+.hero h1{font:300 clamp(3.1rem,8.2vw,7.6rem)/1 var(--display);text-transform:uppercase;letter-spacing:.012em;text-shadow:0 4px 40px rgba(0,0,0,.25)}
+.hero h1 span,.hero h1 em{display:inline}
+.hero h1 em{font-style:italic;font-weight:400}
+.slogan{font:400 clamp(1.05rem,1.55vw,1.32rem)/1.5 var(--sans);letter-spacing:.01em;color:rgba(255,255,255,.94);margin:clamp(16px,2vw,24px) 0 clamp(26px,3.4vw,40px)}
+.cta{justify-content:center;gap:12px}
+.scroll,.dots{display:none}
+
+/* página do imóvel: topo claro */
+.pg-imovel main{padding-top:calc(var(--hds) + clamp(22px,3vw,40px))}
+
+@media(max-width:1080px){
+ .tbusca{flex:1 1 auto;margin-left:auto}
+ header nav{margin-left:0;background:rgba(251,249,245,.985)}
+ nav a:not(.btn){color:var(--ink)}
+ nav .btn.pill{min-height:52px;font-size:15px}
+ .lang-m{position:static;margin-top:10px;box-shadow:none}
+}
+@media(max-width:560px){
+ :root{--hd:76px;--hds:68px}
+ .logo img{height:46px}header.s .logo img{height:42px}
+ .tbusca{height:46px;padding-left:14px}
+ .tbusca button{width:36px;height:36px}
+ .hero{height:min(82svh,700px);border-radius:18px;margin-top:calc(var(--hd) + 8px)}
+ .hero h1{font-size:clamp(3rem,15vw,4.4rem)}
+ .hero h1 span,.hero h1 em{display:block}
+ .cta{width:100%;max-width:420px}
+ .cta .btn{flex:1 1 100%}
+}
+/* com o menu do celular aberto, o desfoque do topo sairia do lugar e prenderia o menu dentro da barra */
+header.menu-open{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:rgb(251,249,245)!important}

@@ -1,8 +1,10 @@
 /* Guarita Imobiliária: página inicial (abertura, carrossel de imóveis, atendimento). */
 (function () {
 'use strict';
-const G = window.Guarita, { $, $$, reduce, wa, CONFIG } = G;
+const G = window.Guarita, { $, $$, reduce, wa, CONFIG, T } = G;
 G.chrome();
+
+const tb = $('#tbusca'), tbq = $('#tb-q'); let porTexto = null;
 
 /* ===== ABERTURA: até 4 paisagens, ~6 s cada, fade suave com zoom discreto e loop infinito ===== */
 (() => {
@@ -174,34 +176,46 @@ function Carousel(root, itemHTML = im => G.card(im)) {
     praiabrava: im => /praia brava/.test(fold([im.bairro, im.endereco, im.nome].join(' '))),
     florida: im => im.estado === 'FL' || /florida|miami|orlando|tampa|fort lauderdale|naples|boca raton/.test(fold([im.cidade, im.estado, im.endereco].join(' ')))
   };
-  let fin = '';
+  let fin = '', q = '';
+  /* busca por texto (barra do topo): nome, bairro, cidade, endereço, tipo, referência e descrição */
+  const temTexto = im => { const alvo = fold([im.nome, im.bairro, im.cidade, im.estado, im.endereco, im.tipo, im.codigo, im.descricao, (im.caracteristicas || []).join(' ')].join(' ')); return fold(q).split(/\s+/).filter(Boolean).every(p => alvo.includes(p)); };
   function buscar(rolar) {
     const reg = selReg.value, testa = REGIOES[reg];
-    const l = todos.filter(im => (!fin || im.finalidade === fin) && (!testa || testa(im)));
-    const filtrando = !!(fin || reg);
-    const nomeReg = reg ? selReg.selectedOptions[0].textContent : '';
-    const oQue = [fin === 'venda' ? 'à venda' : fin === 'locacao' ? 'para alugar' : '', nomeReg ? 'em ' + nomeReg : ''].filter(Boolean).join(' ');
+    const l = todos.filter(im => (!fin || im.finalidade === fin) && (!testa || testa(im)) && (!q || temTexto(im)));
+    const filtrando = !!(fin || reg || q);
+    const op = reg ? selReg.selectedOptions[0] : null;
+    const nomeReg = op ? op.textContent : '', nomeRegPT = op ? (op.dataset.pt || op.textContent) : '';
+    const oQue = [fin === 'venda' ? T('à venda') : fin === 'locacao' ? T('para alugar') : '', nomeReg ? T('em {r}', { r: nomeReg }) : '', q ? T('para “{q}”', { q }) : ''].filter(Boolean).join(' ');
+    const oQuePT = [fin === 'venda' ? 'à venda' : fin === 'locacao' ? 'para alugar' : '', nomeRegPT ? 'em ' + nomeRegPT : '', q ? `(busca: “${q}”)` : ''].filter(Boolean).join(' ');
     res.hidden = !filtrando;
     if (l.length) {
       root.hidden = false; msg.hidden = true; car.render(l);
-      res.innerHTML = filtrando ? `<span><b>${l.length}</b> ${l.length === 1 ? 'imóvel encontrado' : 'imóveis encontrados'} ${G.esc(oQue)}.</span> <button type="button" class="link" data-limpar>Ver todos</button>` : '';
+      res.innerHTML = filtrando ? `<span><b>${l.length}</b> ${T(l.length === 1 ? '{n} imóvel encontrado' : '{n} imóveis encontrados', { n: '' }).trim()} ${G.esc(oQue)}.</span> <button type="button" class="link" data-limpar>${T('Ver todos')}</button>` : '';
     } else {
       root.hidden = true; msg.hidden = true;
-      const txt = `Olá! Vim pelo site da Guarita Imobiliária e procuro um imóvel ${oQue}.`;
-      res.innerHTML = `<span>Ainda não temos imóveis ${G.esc(oQue)} publicados no site, mas a Guarita pode encontrar para você.</span> <a class="btn gold" href="${G.esc(wa(txt))}" target="_blank" rel="noopener">Falar com um especialista</a> <button type="button" class="link" data-limpar>Ver todos os imóveis</button>`;
+      const txt = `Olá! Vim pelo site da Guarita Imobiliária e procuro um imóvel ${oQuePT}.`;
+      res.innerHTML = `<span>${G.esc(T('Ainda não temos imóveis {o} publicados no site, mas a Guarita pode encontrar para você.', { o: oQue }))}</span> <a class="btn gold" href="${G.esc(wa(txt))}" target="_blank" rel="noopener">${T('Falar com um especialista')}</a> <button type="button" class="link" data-limpar>${T('Ver todos os imóveis')}</button>`;
     }
     if (rolar) $('#imoveis').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
   }
   $$('[data-fin]', form).forEach(b => b.onclick = () => { fin = b.dataset.fin; $$('[data-fin]', form).forEach(x => x.setAttribute('aria-pressed', x === b)); buscar(); });
   selReg.addEventListener('change', () => buscar());
   form.addEventListener('submit', e => { e.preventDefault(); buscar(true); });
-  res.addEventListener('click', e => { if (!e.target.closest('[data-limpar]')) return; fin = ''; selReg.value = ''; $$('[data-fin]', form).forEach(x => x.setAttribute('aria-pressed', x.dataset.fin === '')); buscar(); });
+  res.addEventListener('click', e => { if (!e.target.closest('[data-limpar]')) return; fin = ''; q = ''; if (tbq) tbq.value = ''; selReg.value = ''; $$('[data-fin]', form).forEach(x => x.setAttribute('aria-pressed', x.dataset.fin === '')); buscar(); });
   // ?regiao=florida&finalidade=locacao no endereço já abre a busca filtrada
   const qs = new URLSearchParams(location.search);
   if (qs.get('regiao') && REGIOES[qs.get('regiao')]) selReg.value = qs.get('regiao');
   if (['venda', 'locacao'].includes(qs.get('finalidade'))) { fin = qs.get('finalidade'); $$('[data-fin]', form).forEach(x => x.setAttribute('aria-pressed', x.dataset.fin === fin)); }
-  if (fin || selReg.value) buscar(true);
+  if (qs.get('q')) { q = qs.get('q').trim().slice(0, 80); if (tbq) tbq.value = q; }
+  if (fin || selReg.value || q) buscar(true);
+  porTexto = v => { q = v.trim().slice(0, 80); buscar(true); };
 })();
+
+/* barra de busca do topo */
+if (tb) tb.addEventListener('submit', e => {
+  e.preventDefault(); tbq.blur();
+  if (porTexto) porTexto(tbq.value); else $('#imoveis').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+});
 
 G.reveal();
 
@@ -248,12 +262,12 @@ function check(form) {
   $$('.bad', form).forEach(x => x.classList.remove('bad')); $$('.err', form).forEach(x => x.textContent = '');
   const fail = (el, msg, err) => { ok = false; el.classList.add('bad'); (err || el.nextElementSibling).textContent = msg; first = first || el; };
   const nm = $('[name=Nome]', form), tel = $('[type=tel]', form);
-  if (nm.value.trim().length < 2) fail(nm, 'Informe seu nome.');
+  if (nm.value.trim().length < 2) fail(nm, T('Informe seu nome.'));
   const dig = tel.value.replace(/\D/g, '');
-  if (dig.length < 10 || dig.length > 11) fail(tel, 'Informe um WhatsApp com DDD.');
-  $$('select[required]', form).forEach(s => { if (!s.value) fail(s, 'Selecione uma opção.'); });
-  $$('fieldset[data-required]', form).forEach(fs => { if (!$('input:checked', fs)) fail($('input', fs), 'Selecione uma opção.', $('.err', fs)); });
-  const c = $('[name=consent]', form); if (!c.checked) fail(c, 'Autorize o contato para enviar.', $('[data-for=consent]', form));
+  if (dig.length < 10 || dig.length > 11) fail(tel, T('Informe um WhatsApp com DDD.'));
+  $$('select[required]', form).forEach(s => { if (!s.value) fail(s, T('Selecione uma opção.')); });
+  $$('fieldset[data-required]', form).forEach(fs => { if (!$('input:checked', fs)) fail($('input', fs), T('Selecione uma opção.'), $('.err', fs)); });
+  const c = $('[name=consent]', form); if (!c.checked) fail(c, T('Autorize o contato para enviar.'), $('[data-for=consent]', form));
   if (first) first.focus(); return ok;
 }
 $$('form.lead').forEach(form => {

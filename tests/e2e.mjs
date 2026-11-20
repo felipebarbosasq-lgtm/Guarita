@@ -51,10 +51,10 @@ console.log('\n1. index.html aberto direto do disco (modo demonstração)');
   await ctx.addInitScript(() => { let c; Object.defineProperty(window, 'GUARITA_CONFIG', { configurable: true, get: () => c, set: v => { c = { ...v, supabaseUrl: '', supabaseAnonKey: '' }; } }); });
   await p.goto('file://' + path.join(ROOT, 'public/index.html'));
   await p.waitForSelector('#car .prop:not(.skel)');
-  ok(await p.locator('.hero .slide').count() === 3, 'abertura com as 3 fotos enviadas');
+  ok(await p.locator('.hero .slide').count() === 1 && await p.locator('#dots').count() === 0, 'abertura com uma única foto de capa');
   await p.evaluate(() => document.fonts.ready);
-  ok(await p.evaluate(() => ['Cormorant Garamond', 'Jost'].every(n => [...document.fonts].some(f => f.family.replace(/"/g, '') === n && f.status === 'loaded'))), 'fontes originais carregadas mesmo abrindo do disco');
-  ok(await p.locator('.hero h1').innerText() === 'Guarita\nImobiliária' || (await p.locator('.hero h1').innerText()).replace(/\s+/g, ' ') === 'Guarita Imobiliária', 'título "Guarita Imobiliária" mantido');
+  ok(await p.evaluate(() => ['Cormorant Garamond', 'Jost', 'Oswald'].every(n => [...document.fonts].some(f => f.family.replace(/"/g, '') === n && f.status === 'loaded'))), 'fontes originais carregadas mesmo abrindo do disco');
+  ok((await p.locator('.hero h1').textContent()).replace(/\s+/g, ' ').trim() === 'Guarita Imobiliária', 'título "Guarita Imobiliária" mantido');
   ok((await p.locator('.slogan').innerText()) === 'A imobiliária da sua família.', 'slogan mantido');
   ok(await p.locator('.hero .cta a', { hasText: 'Ver imóveis' }).count() === 1 && await p.locator('.hero .cta a', { hasText: 'Falar com um especialista' }).count() === 1, 'dois botões originais');
   const loaded = await p.evaluate(() => [...document.querySelectorAll('.hero .slide img')].map(i => i.currentSrc.split('/').pop()));
@@ -326,9 +326,11 @@ console.log('\n4b. Busca, regiões e WhatsApp');
 for (const [label, opts] of [['computador', { viewport: { width: 1440, height: 900 } }], ['celular', { ...devices['iPhone 13'] }]]) {
   const { ctx, p } = await page(opts);
   await p.goto(SITE + '/'); await p.waitForSelector('#car .prop:not(.skel)');
-  ok(await p.locator('header .lupa').isVisible(), `${label}: lupa visível no topo`);
-  await p.click('header .lupa'); await sleep(900);
-  ok(await p.evaluate(() => document.activeElement && document.activeElement.id === 'busca-reg'), `${label}: lupa leva à busca`);
+  ok(await p.locator('#tb-q').isVisible(), `${label}: barra de busca visível no topo`);
+  await p.fill('#tb-q', 'teste dois'); await p.press('#tb-q', 'Enter'); await sleep(900);
+  ok((await p.locator('#car .prop:not([aria-hidden]) h3').allInnerTexts()).join('|') === 'Teste Dois' && (await p.locator('#busca-res').innerText()).includes('“teste dois”'), `${label}: busca por texto no topo filtra os imóveis`);
+  await p.click('#busca-res [data-limpar]'); await sleep(300);
+  ok(await p.inputValue('#tb-q') === '' && await p.locator('#car .prop:not([aria-hidden])').count() >= 4, `${label}: "Ver todos" limpa a busca por texto`);
   await p.selectOption('#busca-reg', 'itapema'); await sleep(300);
   const nomes = await p.locator('#car .prop:not([aria-hidden]) h3').allInnerTexts();
   ok(nomes.length === 1 && nomes[0] === 'Teste Dois' && (await p.locator('#busca-res').innerText()).replace(/\s+/g, ' ').includes('1 imóvel encontrado em Itapema'), `${label}: filtro Itapema mostra só os imóveis de Itapema`);
@@ -442,25 +444,40 @@ for (const [label, opts, per] of [['computador', { viewport: { width: 1440, heig
 }
 
 /* ================= 5. banner ================= */
-console.log('\n5. Banner cinematográfico');
+console.log('\n5. Banner de capa');
 {
   const { ctx, p } = await page();
   await p.goto(SITE + '/');
   await p.waitForFunction(() => [...document.querySelectorAll('.hero .slide img')].every(i => i.complete && i.naturalWidth));
-  const order = [];
-  const t0 = Date.now();
-  // amostra o brilho do centro do banner para garantir que nunca fica preto durante as trocas
-  let minOpacity = 1;
-  while (Date.now() - t0 < 14500) {
-    const s = await p.evaluate(() => { const on = document.querySelector('.slide.on'), prev = document.querySelector('.slide.prev'); return { k: [...document.querySelectorAll('.slide')].indexOf(on), cover: Math.max(+getComputedStyle(on).opacity, prev ? +getComputedStyle(prev).opacity : 0) }; });
-    if (order[order.length - 1] !== s.k) order.push(s.k);
-    minOpacity = Math.min(minOpacity, s.cover);
-    await sleep(120);
-  }
-  ok(order.length >= 3 && order[0] === 0 && order[1] === 1 && order[2] === 2, 'troca automática a cada ~6 s: ' + order.join('→'));
-  ok(minOpacity > .99, 'sem tela preta entre as fotos (cobertura mínima ' + minOpacity.toFixed(2) + ')');
-  const anim = await p.evaluate(() => getComputedStyle(document.querySelector('.slide.on img')).animationName);
-  ok(anim === 'kb', 'zoom cinematográfico discreto ativo');
+  const src0 = await p.evaluate(() => document.querySelector('.slide.on img').currentSrc); await sleep(7000);
+  ok(await p.evaluate(() => document.querySelector('.slide.on img').currentSrc) === src0 && await p.locator('.slide').count() === 1, 'capa fixa (uma foto, sem troca)');
+  ok(await p.evaluate(() => getComputedStyle(document.querySelector('.slide.on img')).animationName) === 'kb', 'zoom cinematográfico discreto ativo');
+  ok(await p.evaluate(() => parseFloat(getComputedStyle(document.querySelector('.hero')).borderTopLeftRadius) > 10), 'capa com cantos arredondados (estilo minimalista)');
+  await ctx.close();
+}
+
+/* ================= 5b. idiomas ================= */
+console.log('\n5b. Idiomas (Português, English, Español)');
+{
+  const { ctx, p } = await page({ viewport: { width: 1440, height: 900 } });
+  await p.goto(SITE + '/'); await p.waitForSelector('#car .prop:not(.skel)');
+  ok(await p.evaluate(() => document.documentElement.lang) === 'pt-BR' && (await p.locator('.lang-cur b').innerText()) === 'PT', 'português por padrão');
+  await p.click('#lang summary'); await p.click('[data-lang=en]'); await p.waitForLoadState('load'); await p.waitForSelector('#car .prop:not(.skel)');
+  ok(await p.evaluate(() => document.documentElement.lang) === 'en' && (await p.locator('.lang-cur b').innerText()) === 'EN', 'inglês escolhido e lembrado');
+  ok((await p.locator('#nv a[href="#imoveis"]').innerText()) === 'Properties' && (await p.locator('.slogan').innerText()) === 'The real estate agency for your family.', 'menu e slogan em inglês');
+  const c = await p.locator('#car .prop').first().innerText();
+  ok(/View property/.test(c) && /bedrooms|parking|private area/.test(c), 'cartões em inglês (dados do cadastro preservados)');
+  ok(await p.getAttribute('#tb-q', 'placeholder') === 'Beach, neighborhood, building…', 'busca do topo em inglês');
+  await p.selectOption('#busca-reg', 'florida'); await sleep(300);
+  ok(decodeURIComponent(await p.locator('#busca-res a.btn').getAttribute('href')).includes('procuro um imóvel em Flórida (EUA)'), 'mensagem do WhatsApp continua em português');
+  ok(await p.locator('#c-reg option', { hasText: 'Florida (USA)' }).getAttribute('value') === 'Flórida (EUA)', 'opções do formulário enviam o valor em português');
+  await p.click('#lang summary'); await p.click('[data-lang=es]'); await p.waitForLoadState('load');
+  ok((await p.locator('#nv a[href="#imoveis"]').innerText()) === 'Inmuebles' && await p.evaluate(() => document.documentElement.lang) === 'es', 'espanhol');
+  await p.goto(SITE + '/imovel/' + novoSlug); await p.waitForSelector('#im:not([hidden])');
+  ok((await p.locator('#nv a[href$="#imoveis"]').innerText()) === 'Inmuebles' && await p.getAttribute('#im-specs', 'aria-label') === 'Ficha técnica' && (await p.locator('#im-wa').innerText()).includes('WhatsApp'), 'página do imóvel em espanhol');
+  await p.click('#lang summary'); await p.click('[data-lang=pt]'); await p.waitForLoadState('load');
+  ok(await p.evaluate(() => document.documentElement.lang) === 'pt-BR', 'volta ao português');
+  ok(await noHScroll(p), 'sem rolagem horizontal');
   await ctx.close();
 }
 

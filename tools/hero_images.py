@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Gera as fotos da abertura (banner) a partir dos originais e atualiza index.html.
 
-Uso:  python3 tools/hero_images.py PASTA_DOS_ORIGINAIS
+Uso:  python3 tools/hero_images.py PASTA_DOS_ORIGINAIS   (gera as fotos e o HTML)
+      python3 tools/hero_images.py --capa                (só troca a capa no HTML, usando as fotos já geradas)
+
+A abertura mostra UMA foto de capa: a definida em CAPA abaixo (as demais ficam prontas para troca).
       (arquivos 1.jpg, 2.jpg, 3.jpg… na ordem de HERO abaixo, já ampliados; requer Pillow)
 
 Para cada foto cria:
@@ -30,6 +33,7 @@ HERO = [
          alt='Balneário Camboriú ao entardecer, com os arranha-céus, a roda-gigante e o molhe vistos do alto',
          desk=(16 / 9, .45), mob=.34, pos='50% 50%', mpos='50% 50%'),
 ]
+CAPA = 'bc-praia-central'   # foto de capa da abertura (slug de uma das fotos em HERO)
 DESK_W = [1280, 1920, 2560, 3840]
 MOB_W = [720, 1080]
 
@@ -79,7 +83,22 @@ def main(src):
     write_html(meta)
 
 
+def meta_dos_arquivos():
+    """Lê as versões já geradas em OUT (sem refazer as fotos)."""
+    meta = []
+    for h in HERO:
+        ds, ms = [], []
+        for f in sorted(os.listdir(OUT)):
+            m = re.fullmatch(re.escape(h['slug']) + r'(-m)?-(\d+)\.webp', f)
+            if m:
+                (ms if m.group(1) else ds).append((int(m.group(2)), Image.open(os.path.join(OUT, f)).size))
+        if ds:
+            meta.append(dict(h, ds=sorted(ds), ms=sorted(ms)))
+    return meta
+
+
 def write_html(meta):
+    meta = sorted(meta, key=lambda h: h['slug'] != CAPA)[:1]   # só a foto de capa
     def ss(slug, lst, m=''):
         return ', '.join(f'assets/img/hero/{slug}{m}-{w}.webp {w}w' for w, _ in lst)
     slides, dots, credits = [], [], []
@@ -106,7 +125,7 @@ def write_html(meta):
     blocks = {
         'HERO-PRELOAD': preload,
         'HERO-SLIDES': '\n'.join(slides),
-        'HERO-DOTS': f' <div class="dots" id="dots" role="group" aria-label="Paisagens de Balneário Camboriú">{"".join(dots)}</div>',
+        'HERO-DOTS': '',
         'HERO-CREDITS': '\n'.join(credits),
     }
     for path in HTML:
@@ -121,4 +140,7 @@ def write_html(meta):
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         sys.exit(__doc__)
-    main(sys.argv[1])
+    if sys.argv[1] == '--capa':
+        write_html(meta_dos_arquivos()); print('capa:', CAPA)
+    else:
+        main(sys.argv[1])
