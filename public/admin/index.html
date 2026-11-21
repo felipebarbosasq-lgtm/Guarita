@@ -206,15 +206,18 @@
     <p>Para usar o CRM, rode no Supabase (SQL Editor) os arquivos <code>supabase/atualizacao-03-crm-equipe-clientes.sql</code> e depois <code>supabase/atualizacao-04-crm-historico-rodizio.sql</code>.</p>
    </div>
    <div class="adm-tools">
+    <div class="vista" role="group" aria-label="Modo de exibição"><button type="button" data-vista="quadro" aria-pressed="true">▦ Quadro</button><button type="button" data-vista="lista" aria-pressed="false">☰ Lista</button></div>
     <label class="sr" for="cl-q">Pesquisar clientes</label>
     <input type="search" id="cl-q" placeholder="Pesquisar por nome, WhatsApp ou e-mail" autocomplete="off">
     <label class="sr" for="cl-etapa">Etapa</label>
-    <select id="cl-etapa"><option value="">Todas as etapas</option><option value="ativos">Em andamento</option></select>
+    <select id="cl-etapa" data-so-lista><option value="">Todas as etapas</option><option value="ativos">Em andamento</option></select>
     <label class="sr" for="cl-corretor">Corretor</label>
     <select id="cl-corretor" data-gestor hidden><option value="">Todos os corretores</option><option value="_sem">⚠ Sem corretor</option></select>
     <label class="crm-chk"><input type="checkbox" id="cl-atrasados"> Só retornos vencidos</label>
    </div>
    <div class="etapas" id="cl-etapas" aria-label="Clientes por etapa"></div>
+   <p class="muted adm-hint kb-dica" id="kb-dica">Arraste o cliente para outra coluna para mudar a etapa (no iPad: toque, segure um instante e arraste). Toque no cartão para abrir a ficha.</p>
+   <div class="kb" id="cl-board" aria-label="Quadro de clientes por etapa"></div>
    <ol class="adm-list" id="cl-list" aria-live="polite"></ol>
    <p class="adm-empty" id="cl-empty" hidden>Nenhum cliente encontrado.</p>
   </section>

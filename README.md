@@ -198,6 +198,11 @@ mensagens que chegam no WhatsApp da Guarita continuam em português. Traduções
 - Formatação automática para todos os anúncios: R$ 1.234.567,00, áreas em m², singular/plural, mesmo cartão e mesma página.
 
 ## 4.1 CRM (abas Clientes, Equipe e Painel)
+**Quadro de etapas (Clientes):** cada etapa é uma coluna (Novo contato, Em atendimento, Visita agendada, Proposta,
+Fechado, Perdido). Arraste o cartão do cliente para outra coluna e a etapa muda na hora, com registro automático no
+histórico. No iPad: toque, segure um instante e arraste. Também dá para usar as setas ‹ › do cartão. Tocar no cartão
+abre a ficha. O botão **Lista** volta para a visualização em lista (a escolha fica lembrada no aparelho).
+
 - **Equipe:** gestores veem e fazem tudo; corretores veem **só os próprios clientes** e podem cadastrar e editar
   imóveis (não excluir). Para incluir alguém, na aba **Equipe** preencha nome, e-mail e uma senha provisória (ou
   *Gerar senha*) e toque em *Salvar*: o login é criado na hora (função `netlify/functions/equipe.mjs`, só gestores) e

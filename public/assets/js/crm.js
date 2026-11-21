@@ -11,6 +11,7 @@ const ETAPA = Object.fromEntries(ETAPAS);
 const ATIVAS = ['novo', 'atendimento', 'visita', 'proposta'];
 const INTERESSE = { comprar: 'Comprar', alugar: 'Alugar', anunciar: 'Anunciar', investir: 'Investir' };
 const TIPO = { ligacao: '📞 Ligação', whatsapp: '💬 WhatsApp', visita: '🏠 Visita', email: '✉️ E-mail', nota: '📝 Anotação', sistema: '⚙️ Sistema', site: '🌐 Site' };
+let vista = (() => { try { return localStorage.getItem('guarita-crm-vista') === 'lista' ? 'lista' : 'quadro'; } catch (_) { return 'quadro'; } })();
 let equipe = [], clientes = [], cfg = null, crmOk = true, histOk = true, cur = null, curDirty = false, filtroEtapa = '';
 
 const hoje = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
@@ -66,7 +67,7 @@ function opcoesCorretores(sel, incluirSem) {
   return (incluirSem ? '<option value="">— Sem corretor —</option>' : '') + equipe.filter(m => m.ativo !== false).map(m => `<option value="${esc(m.user_id)}"${m.user_id === sel ? ' selected' : ''}>${esc(m.nome || m.email)}${m.papel === 'gestor' ? ' (gestor)' : ''}</option>`).join('');
 }
 function filtrados() {
-  const q = $('#cl-q').value.trim().toLowerCase(), qd = digitos(q), et = $('#cl-etapa').value || filtroEtapa, co = $('#cl-corretor').value, at = $('#cl-atrasados').checked;
+  const q = $('#cl-q').value.trim().toLowerCase(), qd = digitos(q), et = vista === 'quadro' ? '' : ($('#cl-etapa').value || filtroEtapa), co = $('#cl-corretor').value, at = $('#cl-atrasados').checked;
   return clientes.filter(c => (!q || c.nome.toLowerCase().includes(q) || (qd.length >= 3 && c.whatsapp.includes(qd)) || (c.email || '').includes(q))
     && (!et || (et === 'ativos' ? ATIVAS.includes(c.etapa) : c.etapa === et))
     && (!co || (co === '_sem' ? !c.corretor_id : c.corretor_id === co))
@@ -90,9 +91,97 @@ function renderClientes() {
   $('#cl-etapas').innerHTML = ETAPAS.map(([k, n]) => `<button type="button" class="et-chip et-${k}${filtroEtapa === k ? ' on' : ''}" data-et="${k}"><span>${n}</span><b>${base.filter(c => c.etapa === k).length}</b></button>`).join('');
   const l = filtrados();
   $('#cl-count').textContent = `${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'}${me().gestor ? ' no total' : ' com você'} · ${clientes.filter(vencido).length} retornos vencidos`;
-  $('#cl-list').innerHTML = l.map(c => linhaCliente(c)).join('');
-  $('#cl-empty').hidden = !!l.length || !crmOk;
+  const quadro = vista === 'quadro';
+  $$('[data-vista]').forEach(b => b.setAttribute('aria-pressed', b.dataset.vista === vista));
+  $('#cl-etapa').hidden = quadro; $('#cl-etapas').hidden = quadro; $('#cl-list').hidden = quadro; $('#cl-board').hidden = !quadro || !crmOk; $('#kb-dica').hidden = !quadro || !crmOk;
+  $('#cl-list').innerHTML = quadro ? '' : l.map(c => linhaCliente(c)).join('');
+  $('#cl-board').innerHTML = quadro ? ETAPAS.map(([k, n]) => { const cs = l.filter(c => c.etapa === k);
+    return `<section class="kb-col et-${k}" data-et="${k}" aria-label="${n}: ${cs.length} ${cs.length === 1 ? 'cliente' : 'clientes'}"><div class="kb-h"><span class="et-dot" aria-hidden="true"></span><h3>${n}</h3><b>${cs.length}</b></div>
+     <ol class="kb-list">${cs.map(cartao).join('') || '<li class="kb-vazio">Arraste um cliente para cá</li>'}</ol></section>`; }).join('') : '';
+  $('#cl-empty').hidden = quadro || !!l.length || !crmOk;
 }
+/* cartão do quadro: toque abre a ficha; arraste muda a etapa; ‹ › movem pelo teclado/toque */
+function cartao(c) {
+  const v = vencido(c), i = ETAPAS.findIndex(e => e[0] === c.etapa);
+  return `<li class="kb-card" data-id="${esc(c.id)}" tabindex="0" aria-label="${esc(c.nome)}, ${ETAPA[c.etapa]}. Setas para os lados mudam a etapa; Enter abre a ficha.">
+    <div class="kb-nm"><b>${esc(c.nome)}</b>${c.origem === 'site' ? '<span class="badge">Site</span>' : ''}</div>
+    <small>${esc(fone(c.whatsapp))}${INTERESSE[c.interesse] ? ' · ' + INTERESSE[c.interesse] : ''}</small>
+    ${me().gestor ? `<small>${c.corretor_id ? '👤 ' + esc(nomeDe(c.corretor_id)) : '<b class="warn">⚠ sem corretor</b>'}</small>` : ''}
+    ${c.proximo_contato ? `<small class="${v ? 'warn' : ''}">📅 retorno ${dataBR(c.proximo_contato)}${v ? ' (vencido)' : ''}</small>` : ''}
+    <div class="kb-acts"><button type="button" class="ib" data-mover="-1" ${i <= 0 ? 'disabled' : ''} aria-label="Voltar para ${i > 0 ? ETAPAS[i - 1][1] : ''}" title="Etapa anterior">‹</button>
+     <a class="ib" href="https://wa.me/55${esc(c.whatsapp)}" target="_blank" rel="noopener" title="WhatsApp" aria-label="Conversar com ${esc(c.nome)} no WhatsApp">💬</a>
+     <button type="button" class="ib" data-abrir title="Abrir ficha" aria-label="Abrir ficha de ${esc(c.nome)}">✎</button>
+     <button type="button" class="ib" data-mover="1" ${i >= ETAPAS.length - 1 ? 'disabled' : ''} aria-label="Avançar para ${i < ETAPAS.length - 1 ? ETAPAS[i + 1][1] : ''}" title="Próxima etapa">›</button></div>
+   </li>`;
+}
+/* muda a etapa na hora (o banco registra "Etapa: X → Y" no histórico automaticamente) */
+async function mover(id, etapa) {
+  const c = clientes.find(x => x.id === id); if (!c || c.etapa === etapa) return;
+  const antes = c.etapa; c.etapa = etapa; renderClientes(); focar(id);
+  const { data, error } = await sb.from('clientes').update({ etapa }).eq('id', id).select().single();
+  if (error || !data) { c.etapa = antes; renderClientes(); return A.toast(error ? A.errMsg(error) : 'Não foi possível mover este cliente.', true); }
+  Object.assign(c, data); atualizarContador();
+  A.toast(`${c.nome}: ${ETAPA[etapa]}` + (etapa === 'perdido' ? '. Abra a ficha para anotar o motivo.' : '.'));
+}
+const focar = id => { const el = $(`#cl-board .kb-card[data-id="${CSS.escape(id)}"]`); if (el && document.activeElement && document.activeElement.closest('#cl-board')) el.focus({ preventScroll: true }); };
+const passo = (id, d) => { const c = clientes.find(x => x.id === id); if (!c) return; const i = ETAPAS.findIndex(e => e[0] === c.etapa) + d; if (i >= 0 && i < ETAPAS.length) mover(id, ETAPAS[i][0]); };
+$$('[data-vista]').forEach(b => b.onclick = () => { vista = b.dataset.vista; try { localStorage.setItem('guarita-crm-vista', vista); } catch (_) {} renderClientes(); });
+
+/* arrastar: mouse (começa ao mover) e dedo (toque e segure ~0,2 s, depois arraste) */
+(() => {
+  const board = $('#cl-board'); let dr = null, raf = 0, acabouDeArrastar = false;
+  const limpar = () => {
+    if (!dr) return; clearTimeout(dr.timer); cancelAnimationFrame(raf);
+    if (dr.ghost) dr.ghost.remove(); dr.card.classList.remove('kb-orig'); $$('.kb-col.alvo', board).forEach(c => c.classList.remove('alvo'));
+    document.body.classList.remove('kb-arr'); dr = null;
+  };
+  const colunaEm = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest('#cl-board .kb-col'); };
+  const iniciar = () => {
+    const r = dr.card.getBoundingClientRect(); dr.on = true; dr.dx = dr.x - r.left; dr.dy = dr.y - r.top;
+    const g = dr.card.cloneNode(true); g.classList.add('kb-ghost'); g.removeAttribute('tabindex'); g.setAttribute('aria-hidden', 'true');
+    g.style.width = r.width + 'px'; g.style.left = r.left + 'px'; g.style.top = r.top + 'px'; document.body.appendChild(g); dr.ghost = g;
+    dr.card.classList.add('kb-orig'); document.body.classList.add('kb-arr'); if (navigator.vibrate) navigator.vibrate(12);
+    const loop = () => { if (!dr || !dr.on) return; const br = board.getBoundingClientRect();
+      if (dr.cx < br.left + 60) board.scrollLeft -= 14; else if (dr.cx > br.right - 60) board.scrollLeft += 14;
+      if (dr.cy < 90) scrollBy(0, -14); else if (dr.cy > innerHeight - 70) scrollBy(0, 14);
+      raf = requestAnimationFrame(loop); };
+    dr.cx = dr.x; dr.cy = dr.y; raf = requestAnimationFrame(loop);
+  };
+  board.addEventListener('pointerdown', e => {
+    const card = e.target.closest('.kb-card'); if (!card || e.target.closest('a,button') || e.button > 0) return;
+    limpar(); dr = { card, id: card.dataset.id, x: e.clientX, y: e.clientY, toque: e.pointerType !== 'mouse', on: false };
+    if (dr.toque) dr.timer = setTimeout(() => { if (dr && !dr.on) iniciar(); }, 220);
+  });
+  addEventListener('pointermove', e => {
+    if (!dr) return;
+    const dist = Math.hypot(e.clientX - dr.x, e.clientY - dr.y);
+    if (!dr.on) { if (!dr.toque && dist > 6) iniciar(); else if (dr.toque && dist > 10) { limpar(); } return; }
+    e.preventDefault(); dr.cx = e.clientX; dr.cy = e.clientY;
+    dr.ghost.style.transform = `translate(${e.clientX - dr.x}px, ${e.clientY - dr.y}px) rotate(2deg)`;
+    const col = colunaEm(e.clientX, e.clientY);
+    $$('.kb-col', board).forEach(c => c.classList.toggle('alvo', c === col));
+  }, { passive: false });
+  // enquanto arrasta com o dedo, a página não rola
+  addEventListener('touchmove', e => { if (dr && dr.on) e.preventDefault(); }, { passive: false });
+  addEventListener('pointerup', e => {
+    if (!dr) return;
+    if (dr.on) { const col = colunaEm(e.clientX, e.clientY), id = dr.id; acabouDeArrastar = true; setTimeout(() => acabouDeArrastar = false, 50); limpar(); if (col) mover(id, col.dataset.et); }
+    else limpar();
+  });
+  addEventListener('pointercancel', limpar);
+  board.addEventListener('contextmenu', e => { if (e.target.closest('.kb-card')) e.preventDefault(); });
+  board.addEventListener('click', e => {
+    const card = e.target.closest('.kb-card'); if (!card) return;
+    const m = e.target.closest('[data-mover]'); if (m) { passo(card.dataset.id, +m.dataset.mover); return; }
+    if (acabouDeArrastar || e.target.closest('a,button')) return;
+    const c = clientes.find(x => x.id === card.dataset.id); if (c) abrirCliente(c);
+  });
+  board.addEventListener('keydown', e => {
+    const card = e.target.closest('.kb-card'); if (!card || e.target !== card) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); passo(card.dataset.id, e.key === 'ArrowRight' ? 1 : -1); }
+    if (e.key === 'Enter') { const c = clientes.find(x => x.id === card.dataset.id); if (c) abrirCliente(c); }
+  });
+})();
 ['#cl-q', '#cl-etapa', '#cl-corretor', '#cl-atrasados'].forEach(s => $(s).addEventListener('input', () => { if (s === '#cl-etapa') filtroEtapa = ''; renderClientes(); }));
 $('#cl-etapas').addEventListener('click', e => { const b = e.target.closest('[data-et]'); if (!b) return; filtroEtapa = filtroEtapa === b.dataset.et ? '' : b.dataset.et; $('#cl-etapa').value = ''; renderClientes(); });
 document.addEventListener('click', e => { const b = e.target.closest('[data-abrir]'); if (!b) return; const c = clientes.find(x => x.id === b.closest('[data-id]').dataset.id); if (c) abrirCliente(c); });
